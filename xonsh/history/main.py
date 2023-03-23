@@ -66,11 +66,10 @@ def _xh_find_histfile_var(file_list, default=None):
                     hist_file = xt.expanduser_abs_path(hist_file)
                     if os.path.isfile(hist_file):
                         return hist_file
-    else:
-        if default:
-            default = xt.expanduser_abs_path(default)
-            if os.path.isfile(default):
-                return default
+    if default:
+        default = xt.expanduser_abs_path(default)
+        if os.path.isfile(default):
+            return default
 
 
 def _xh_bash_hist_parser(location=None, **kwargs):
@@ -159,14 +158,16 @@ def _xh_get_history(
         slices = [xt.ensure_slice(s) for s in slices]
         cmds = xt.get_portions(cmds, slices)
     if start_time or end_time:
-        if start_time is None:
-            start_time = 0.0
-        else:
-            start_time = xt.ensure_timestamp(start_time, datetime_format)
-        if end_time is None:
-            end_time = float("inf")
-        else:
-            end_time = xt.ensure_timestamp(end_time, datetime_format)
+        start_time = (
+            0.0
+            if start_time is None
+            else xt.ensure_timestamp(start_time, datetime_format)
+        )
+        end_time = (
+            float("inf")
+            if end_time is None
+            else xt.ensure_timestamp(end_time, datetime_format)
+        )
         cmds = _xh_filter_ts(cmds, start_time, end_time)
     return cmds
 
@@ -184,9 +185,12 @@ class HistoryAlias(xcli.ArgParserAlias):
     """Try 'history <command> --help' for more info"""
 
     def hook_post_add_argument(self, action, param, func, **_):
-        if func.__name__ in {"show", "transfer"}:
-            if param in {"session", "source", "target"}:
-                action.choices = tuple(_XH_HISTORY_SESSIONS)
+        if func.__name__ in {"show", "transfer"} and param in {
+            "session",
+            "source",
+            "target",
+        }:
+            action.choices = tuple(_XH_HISTORY_SESSIONS)
 
     def show(
         self,
@@ -254,21 +258,17 @@ class HistoryAlias(xcli.ArgParserAlias):
             for c in commands:
                 dt = datetime.datetime.fromtimestamp(c["ts"])
                 print(
-                    "{}:({}) {}".format(c["ind"], xt.format_datetime(dt), c["inp"]),
+                    f'{c["ind"]}:({xt.format_datetime(dt)}) {c["inp"]}',
                     file=_stdout,
                     end=end,
                 )
         elif numerate:
             for c in commands:
-                print("{}: {}".format(c["ind"], c["inp"]), file=_stdout, end=end)
+                print(f'{c["ind"]}: {c["inp"]}', file=_stdout, end=end)
         elif timestamp:
             for c in commands:
                 dt = datetime.datetime.fromtimestamp(c["ts"])
-                print(
-                    "({}) {}".format(xt.format_datetime(dt), c["inp"]),
-                    file=_stdout,
-                    end=end,
-                )
+                print(f'({xt.format_datetime(dt)}) {c["inp"]}', file=_stdout, end=end)
         else:
             for c in commands:
                 print(c["inp"], file=_stdout, end=end)
@@ -279,7 +279,7 @@ class HistoryAlias(xcli.ArgParserAlias):
         hist = XSH.history
         if not hist.sessionid:
             return
-        print(str(hist.sessionid), file=_stdout)
+        print(hist.sessionid, file=_stdout)
 
     @staticmethod
     def pull(show_commands=False, _stdout=None):
@@ -300,8 +300,7 @@ class HistoryAlias(xcli.ArgParserAlias):
                 file=_stdout,
             )
 
-        lines_added = hist.pull(show_commands)
-        if lines_added:
+        if lines_added := hist.pull(show_commands):
             print(f"Added {lines_added} records!", file=_stdout)
         else:
             print("No records found!", file=_stdout)
@@ -345,7 +344,7 @@ class HistoryAlias(xcli.ArgParserAlias):
         hist = XSH.history
         if not hist.filename:
             return
-        print(str(hist.filename), file=_stdout)
+        print(hist.filename, file=_stdout)
 
     @staticmethod
     def info(
@@ -485,7 +484,7 @@ class HistoryAlias(xcli.ArgParserAlias):
                 args = ["show", "session"] + args
 
         if args[0] == "show":
-            if not any(a in _XH_HISTORY_SESSIONS for a in args):
+            if all(a not in _XH_HISTORY_SESSIONS for a in args):
                 args.insert(1, "session")
 
             kwargs.setdefault("lenient", True)

@@ -30,7 +30,7 @@ def clean_tables():
     for f in TABLES:
         if os.path.isfile(f):
             os.remove(f)
-            print("Removed " + f)
+            print(f"Removed {f}")
 
 
 os.environ["XONSH_DEBUG"] = "1"
@@ -88,7 +88,7 @@ def dirty_version():
         print("failed to get commit date", file=sys.stderr)
     with open("xonsh/dev.githash", "w") as f:
         f.write(f"{sha}|{_date}")
-    print("wrote git version: " + sha, file=sys.stderr)
+    print(f"wrote git version: {sha}", file=sys.stderr)
     return True
 
 
@@ -188,7 +188,7 @@ class install_scripts_quoted_shebang(install_scripts):
             and " " in shebang[2:].strip()
             and '"' not in shebang
         ):
-            quoted_shebang = '#!"%s"' % shebang[2:].strip()
+            quoted_shebang = f'#!"{shebang[2:].strip()}"'
             contents = contents.replace(shebang, quoted_shebang)
         super().write_script(script_name, contents, mode, *ignored)
 
@@ -239,11 +239,10 @@ cmdclass = {
     "build_py": xbuild_py,
     "develop": xdevelop,
     "bdist_wheel": xbdist,
+    "install_scripts": install_scripts_quoted_shebang
+    if os.name == "nt"
+    else install_scripts_rewrite,
 }
-if os.name == "nt":
-    cmdclass["install_scripts"] = install_scripts_quoted_shebang
-else:
-    cmdclass["install_scripts"] = install_scripts_rewrite
 
 
 def main():

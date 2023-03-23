@@ -72,7 +72,7 @@ class FStringAdaptor:
                     raise
             # We can olny get here in the case of handled SyntaxError.
             # Patch the last error and start over.
-            xonsh_field = (error_expr, self.filename if self.filename else None)
+            xonsh_field = error_expr, self.filename or None
             field_id = id(xonsh_field)
             self.fields[field_id] = xonsh_field
             eval_field = f"__xonsh__.eval_fstring_field({field_id})"

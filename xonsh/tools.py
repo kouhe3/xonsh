@@ -66,11 +66,11 @@ def chdir(adir):
 
 @functools.lru_cache(1)
 def is_superuser():
-    if ON_WINDOWS:
-        rtn = ctypes.windll.shell32.IsUserAnAdmin() != 0
-    else:
-        rtn = os.getuid() == 0
-    return rtn
+    return (
+        ctypes.windll.shell32.IsUserAnAdmin() != 0
+        if ON_WINDOWS
+        else os.getuid() == 0
+    )
 
 
 @lazyobject
@@ -183,33 +183,33 @@ class EnvPath(cabc.MutableSequence):
     def __init__(self, args=None):
         if not args:
             self._l = []
-        else:
-            if isinstance(args, str):
-                self._l = args.split(os.pathsep)
-            elif isinstance(args, pathlib.Path):
-                self._l = [args]
-            elif isinstance(args, bytes):
-                # decode bytes to a string and then split based on
-                # the default path separator
-                self._l = decode_bytes(args).split(os.pathsep)
-            elif isinstance(args, cabc.Iterable):
-                # put everything in a list -before- performing the type check
-                # in order to be able to retrieve it later, for cases such as
-                # when a generator expression was passed as an argument
-                args = list(args)
-                if not all(isinstance(i, (str, bytes, pathlib.Path)) for i in args):
-                    # make TypeError's message as informative as possible
-                    # when given an invalid initialization sequence
-                    raise TypeError(
-                        "EnvPath's initialization sequence should only "
-                        "contain str, bytes and pathlib.Path entries"
-                    )
+        elif isinstance(args, str):
+            self._l = args.split(os.pathsep)
+        elif isinstance(args, pathlib.Path):
+            self._l = [args]
+        elif isinstance(args, bytes):
+            # decode bytes to a string and then split based on
+            # the default path separator
+            self._l = decode_bytes(args).split(os.pathsep)
+        elif isinstance(args, cabc.Iterable):
+            # put everything in a list -before- performing the type check
+            # in order to be able to retrieve it later, for cases such as
+            # when a generator expression was passed as an argument
+            args = list(args)
+            if all(isinstance(i, (str, bytes, pathlib.Path)) for i in args):
                 self._l = args
             else:
+                # make TypeError's message as informative as possible
+                # when given an invalid initialization sequence
                 raise TypeError(
-                    "EnvPath cannot be initialized with items "
-                    "of type %s" % type(args)
+                    "EnvPath's initialization sequence should only "
+                    "contain str, bytes and pathlib.Path entries"
                 )
+        else:
+            raise TypeError(
+                "EnvPath cannot be initialized with items "
+                "of type %s" % type(args)
+            )
 
     def __getitem__(self, item):
         # handle slices separately
@@ -241,9 +241,7 @@ class EnvPath(cabc.MutableSequence):
         return repr(self._l)
 
     def __eq__(self, other):
-        if len(self) != len(other):
-            return False
-        return all(map(operator.eq, self, other))
+        return False if len(self) != len(other) else all(map(operator.eq, self, other))
 
     def _repr_pretty_(self, p, cycle):
         """Pretty print path list"""
@@ -309,11 +307,7 @@ class FlexibleFormatter(string.Formatter):
     def get_value(self, key: "int|str", args, kwargs) -> str:
         if isinstance(key, int):
             return args[key]
-        else:
-            if key in kwargs:
-                return kwargs[key]
-            # in case of colors, this will work without nested braces
-            return "{" + key + "}"
+        return kwargs[key] if key in kwargs else "{" + key + "}"
 
 
 @lazyobject
@@ -454,12 +448,12 @@ def subproc_toks(
             continue
         if tok.type in LPARENS:
             lparens.append(tok.type)
-        if greedy and len(lparens) > 0 and "LPAREN" in lparens:
+        if greedy and lparens and "LPAREN" in lparens:
             toks.append(tok)
             if tok.type == "RPAREN":
                 lparens.pop()
             continue
-        if len(toks) == 0 and tok.type in BEG_TOK_SKIPS:
+        if not toks and tok.type in BEG_TOK_SKIPS:
             continue  # handle indentation
         elif len(toks) > 0 and toks[-1].type in END_TOK_TYPES:
             if _is_not_lparen_and_rparen(lparens, toks[-1]):
@@ -487,22 +481,17 @@ def subproc_toks(
                 prev_tok_end = toks[-2].lexpos + len(toks[-2].value)
             else:
                 prev_tok_end = len(line)
-            if "#" in line[prev_tok_end:]:
-                tok.lexpos = prev_tok_end  # prevents wrapping comments
-            else:
-                tok.lexpos = len(line)
+            tok.lexpos = prev_tok_end if "#" in line[prev_tok_end:] else len(line)
             break
         elif check_bad_str_token(tok):
             return
     else:
-        if len(toks) > 0 and toks[-1].type in END_TOK_TYPES:
+        if toks and toks[-1].type in END_TOK_TYPES:
             if _is_not_lparen_and_rparen(lparens, toks[-1]):
                 pass
-            elif greedy and toks[-1].type == "RPAREN":
-                pass
-            else:
+            elif not greedy or toks[-1].type != "RPAREN":
                 toks.pop()
-        if len(toks) == 0:
+        if not toks:
             return  # handle comment lines
         tok = toks[-1]
         pos = tok.lexpos
@@ -511,7 +500,7 @@ def subproc_toks(
         else:
             el = line[pos:].split("#")[0].rstrip()
             end_offset = len(el)
-    if len(toks) == 0:
+    if not toks:
         return  # handle comment lines
     elif saw_macro or greedy:
         end_offset = len(toks[-1].value.rstrip()) + 1
@@ -520,7 +509,7 @@ def subproc_toks(
         end_offset += _offset_from_prev_lines(line, toks[-1].lineno)
     beg, end = toks[0].lexpos, (toks[-1].lexpos + end_offset)
     end = len(line[:end].rstrip())
-    rtn = "![" + line[beg:end] + "]"
+    rtn = f"![{line[beg:end]}]"
     if returnline:
         rtn = line[:beg] + rtn + line[end:]
     return rtn
@@ -543,25 +532,21 @@ def check_quotes(s):
     starts_as_str = RE_BEGIN_STRING.match(s) is not None
     ends_as_str = s.endswith('"') or s.endswith("'")
     if not starts_as_str and not ends_as_str:
-        ok = True
-    elif starts_as_str and not ends_as_str:
-        ok = False
-    elif not starts_as_str and ends_as_str:
-        ok = False
+        return True
+    elif starts_as_str and not ends_as_str or not starts_as_str:
+        return False
     else:
         m = RE_COMPLETE_STRING.match(s)
-        ok = m is not None
-    return ok
+        return m is not None
 
 
 def _have_open_triple_quotes(s):
     if s.count('"""') % 2 == 1:
-        open_triple = '"""'
+        return '"""'
     elif s.count("'''") % 2 == 1:
-        open_triple = "'''"
+        return "'''"
     else:
-        open_triple = False
-    return open_triple
+        return False
 
 
 def get_line_continuation():
@@ -631,10 +616,7 @@ def is_balanced(expr, ltok, rtok):
     if lcnt == 0:
         return True
     rcnt = expr.count(rtok)
-    if lcnt == rcnt:
-        return True
-    else:
-        return False
+    return lcnt == rcnt
 
 
 def subexpr_from_unbalanced(expr, ltok, rtok):
@@ -685,9 +667,7 @@ def encode(u, encoding=None):
 
 
 def cast_unicode(s, encoding=None):
-    if isinstance(s, bytes):
-        return decode(s, encoding)
-    return s
+    return decode(s, encoding) if isinstance(s, bytes) else s
 
 
 def safe_hasattr(obj, attr):
@@ -732,20 +712,14 @@ def indent(instr, nspaces=4, ntabs=0, flatten=False):
     else:
         pat = re.compile(r"^", re.MULTILINE)
     outstr = re.sub(pat, ind, instr)
-    if outstr.endswith(os.linesep + ind):
-        return outstr[: -len(ind)]
-    else:
-        return outstr
+    return outstr[: -len(ind)] if outstr.endswith(os.linesep + ind) else outstr
 
 
 def get_sep():
     """Returns the appropriate filepath separator char depending on OS and
     xonsh options set
     """
-    if ON_WINDOWS and xsh.env.get("FORCE_POSIX_PATHS"):
-        return os.altsep
-    else:
-        return os.sep
+    return os.altsep if ON_WINDOWS and xsh.env.get("FORCE_POSIX_PATHS") else os.sep
 
 
 def fallback(cond, backup):
@@ -810,12 +784,9 @@ def _yield_accessible_unix_file_names(path):
     if not os.path.exists(path):
         return
     for file_ in os.scandir(path):
-        try:
+        with contextlib.suppress(OSError):
             if file_.is_file() and os.access(file_.path, os.X_OK):
                 yield file_.name
-        except OSError:
-            # broken Symlink are neither dir not files
-            pass
 
 
 def _executables_in_posix(path):
@@ -851,10 +822,7 @@ def _executables_in_windows(path):
 
 def executables_in(path) -> tp.Iterable[str]:
     """Returns a generator of files in path that the user could execute."""
-    if ON_WINDOWS:
-        func = _executables_in_windows
-    else:
-        func = _executables_in_posix
+    func = _executables_in_windows if ON_WINDOWS else _executables_in_posix
     try:
         yield from func(path)
     except PermissionError:
@@ -903,12 +871,8 @@ def command_not_found(cmd, env):
     """Uses various mechanism to suggest packages for a command that cannot
     currently be found.
     """
-    if ON_LINUX:
-        rtn = debian_command_not_found(cmd)
-    else:
-        rtn = ""
-    conda = conda_suggest_command_not_found(cmd, env)
-    if conda:
+    rtn = debian_command_not_found(cmd) if ON_LINUX else ""
+    if conda := conda_suggest_command_not_found(cmd, env):
         rtn = rtn + "\n\n" + conda if rtn else conda
     return rtn
 
@@ -926,14 +890,18 @@ def suggest_commands(cmd, env):
     suggested = {}
 
     for alias in xsh.aliases:
-        if alias not in suggested:
-            if levenshtein(alias.lower(), cmd, thresh) < thresh:
-                suggested[alias] = "Alias"
+        if (
+            alias not in suggested
+            and levenshtein(alias.lower(), cmd, thresh) < thresh
+        ):
+            suggested[alias] = "Alias"
 
     for _cmd in xsh.commands_cache.all_commands:
-        if _cmd not in suggested:
-            if levenshtein(_cmd.lower(), cmd, thresh) < thresh:
-                suggested[_cmd] = f"Command ({_cmd})"
+        if (
+            _cmd not in suggested
+            and levenshtein(_cmd.lower(), cmd, thresh) < thresh
+        ):
+            suggested[_cmd] = f"Command ({_cmd})"
 
     suggested = collections.OrderedDict(
         sorted(
@@ -947,10 +915,11 @@ def suggest_commands(cmd, env):
     else:
         oneof = "" if num == 1 else "one of "
         tips = f"Did you mean {oneof}the following?"
-        items = list(suggested.popitem(False) for _ in range(num))
+        items = [suggested.popitem(False) for _ in range(num)]
         length = max(len(key) for key, _ in items) + 2
         alternatives = "\n".join(
-            "    {: <{}} {}".format(key + ":", length, val) for key, val in items
+            "    {: <{}} {}".format(f"{key}:", length, val)
+            for key, val in items
         )
         rtn = f"{tips}\n{alternatives}"
         c = command_not_found(cmd, env)
@@ -994,10 +963,7 @@ def print_warning(msg):
                 "$XONSH_TRACEBACK_LOGFILE = <filename>\n"
             )
         traceback.print_stack()
-    # additionally, check if a file for traceback logging has been
-    # specified and convert to a proper option if needed
-    log_file = to_logfile_opt(log_file)
-    if log_file:
+    if log_file := to_logfile_opt(log_file):
         # if log_file <> '' or log_file <> None, append
         # traceback log there as well
         with open(os.path.abspath(log_file), "a") as f:
@@ -1063,10 +1029,7 @@ def print_exception(msg=None, exc_info=None):
 
         display_colored_error_message(exc_info)
 
-    # additionally, check if a file for traceback logging has been
-    # specified and convert to a proper option if needed
-    log_file = to_logfile_opt(log_file)
-    if log_file:
+    if log_file := to_logfile_opt(log_file):
         # if log_file <> '' or log_file <> None, append
         # traceback log there as well
         with open(os.path.abspath(log_file), "a") as f:
@@ -1102,7 +1065,7 @@ def display_colored_error_message(exc_info, strip_xonsh_error_types=True, limit=
     ):
         content = content[:-1]
 
-    traceback_str = "".join([v for v in content])
+    traceback_str = "".join(list(content))
     traceback_str += "" if traceback_str.endswith("\n") else "\n"
 
     # color the traceback if available
@@ -1145,7 +1108,7 @@ def is_writable_file(filepath):
         return False
     # if the file exists and is writable, we're fine
     if os.path.exists(filepath):
-        return True if os.access(filepath, os.W_OK) else False
+        return bool(os.access(filepath, os.W_OK))
     # if the path doesn't exist, isolate its directory component
     # and ensure that directory is writable instead
     return os.access(os.path.dirname(filepath), os.W_OK)
@@ -1191,7 +1154,7 @@ def escape_windows_cmd_string(s):
     http://www.robvanderwoude.com/escapechars.php
     """
     for c in '^()%!<>&|"':
-        s = s.replace(c, "^" + c)
+        s = s.replace(c, f"^{c}")
     return s
 
 
@@ -1204,29 +1167,23 @@ def argvquote(arg, force=False):
     suggestions outlined here:
     https://blogs.msdn.microsoft.com/twistylittlepassagesallalike/2011/04/23/everyone-quotes-command-line-arguments-the-wrong-way/
     """
-    if not force and len(arg) != 0 and not any([c in arg for c in ' \t\n\v"']):
+    if not force and len(arg) != 0 and all(c not in arg for c in ' \t\n\v"'):
         return arg
-    else:
+    n_backslashes = 0
+    cmdline = '"'
+    for c in arg:
+        if c == "\\":
+            # first count the number of current backslashes
+            n_backslashes += 1
+            continue
+        cmdline += (n_backslashes * 2 + 1) * "\\" if c == '"' else n_backslashes * "\\"
         n_backslashes = 0
-        cmdline = '"'
-        for c in arg:
-            if c == "\\":
-                # first count the number of current backslashes
-                n_backslashes += 1
-                continue
-            if c == '"':
-                # Escape all backslashes and the following double quotation mark
-                cmdline += (n_backslashes * 2 + 1) * "\\"
-            else:
-                # backslashes are not special here
-                cmdline += n_backslashes * "\\"
-            n_backslashes = 0
-            cmdline += c
-        # Escape all backslashes, but let the terminating
-        # double quotation mark we add below be interpreted
-        # as a metacharacter
-        cmdline += +n_backslashes * 2 * "\\" + '"'
-        return cmdline
+        cmdline += c
+    # Escape all backslashes, but let the terminating
+    # double quotation mark we add below be interpreted
+    # as a metacharacter
+    cmdline += +n_backslashes * 2 * "\\" + '"'
+    return cmdline
 
 
 def on_main_thread():
@@ -1394,10 +1351,7 @@ def is_logfile_opt(x):
     """
     if x is None:
         return True
-    if not isinstance(x, str):
-        return False
-    else:
-        return is_writable_file(x) or x == ""
+    return is_writable_file(x) or x == "" if isinstance(x, str) else False
 
 
 def to_logfile_opt(x):
@@ -1409,27 +1363,21 @@ def to_logfile_opt(x):
         x = str(x)
     if is_logfile_opt(x):
         return expand_path(x) if x else x
-    else:
-        # if option is not valid, return a proper
-        # option and inform the user on stderr
-        sys.stderr.write(
-            "xonsh: $XONSH_TRACEBACK_LOGFILE must be a "
-            "filepath pointing to a file that either exists "
-            "and is writable or that can be created.\n"
-        )
-        return None
+    # if option is not valid, return a proper
+    # option and inform the user on stderr
+    sys.stderr.write(
+        "xonsh: $XONSH_TRACEBACK_LOGFILE must be a "
+        "filepath pointing to a file that either exists "
+        "and is writable or that can be created.\n"
+    )
+    return None
 
 
 def logfile_opt_to_str(x):
     """
     Detypes a $XONSH_TRACEBACK_LOGFILE option.
     """
-    if x is None:
-        # None should not be detyped to 'None', as 'None' constitutes
-        # a perfectly valid filename and retyping it would introduce
-        # ambiguity. Detype to the empty string instead.
-        return ""
-    return str(x)
+    return "" if x is None else str(x)
 
 
 _FALSES = LazyObject(
@@ -1444,7 +1392,7 @@ def to_bool(x):
     if isinstance(x, bool):
         return x
     elif isinstance(x, str):
-        return False if x.lower() in _FALSES else True
+        return x.lower() not in _FALSES
     else:
         return bool(x)
 
@@ -1455,10 +1403,7 @@ def to_bool_or_none(x):
         return x
     elif isinstance(x, str):
         low_x = x.lower()
-        if low_x == "none":
-            return None
-        else:
-            return False if x.lower() in _FALSES else True
+        return None if low_x == "none" else x.lower() not in _FALSES
     else:
         return bool(x)
 
@@ -1470,10 +1415,7 @@ def to_itself(x):
 
 def to_int_or_none(x) -> tp.Optional[int]:
     """Convert the given value to integer if possible. Otherwise return None"""
-    if isinstance(x, str) and x.lower() == "none":
-        return None
-    else:
-        return int(x)
+    return None if isinstance(x, str) and x.lower() == "none" else int(x)
 
 
 def bool_to_str(x):
@@ -1497,10 +1439,7 @@ _BREAKS = LazyObject(
 
 
 def to_bool_or_break(x):
-    if isinstance(x, str) and x.lower() in _BREAKS:
-        return "break"
-    else:
-        return to_bool(x)
+    return "break" if isinstance(x, str) and x.lower() in _BREAKS else to_bool(x)
 
 
 def is_bool_or_int(x):
@@ -1565,18 +1504,13 @@ def ensure_slice(x):
         return x
     try:
         x = int(x)
-        if x != -1:
-            s = slice(x, x + 1)
-        else:
-            s = slice(-1, None, None)
+        s = slice(x, x + 1) if x != -1 else slice(-1, None, None)
     except ValueError:
         x = x.strip("[]()")
-        m = SLICE_REG.fullmatch(x)
-        if m:
-            groups = (int(i) if i else None for i in m.groups())
-            s = slice(*groups)
-        else:
+        if not (m := SLICE_REG.fullmatch(x)):
             raise ValueError(f"cannot convert {x!r} to slice")
+        groups = (int(i) if i else None for i in m.groups())
+        s = slice(*groups)
     except TypeError:
         try:
             s = slice(*(int(i) for i in x))
@@ -1597,11 +1531,9 @@ def get_portions(it, slices):
         slices = [slices]
     if len(slices) == 1:
         s = slices[0]
-        try:
+        with contextlib.suppress(ValueError):
             yield from itertools.islice(it, s.start, s.stop, s.step)
             return
-        except ValueError:  # islice failed
-            pass
     it = list(it)
     for s in slices:
         yield from it[s]
@@ -1611,13 +1543,10 @@ def is_slice_as_str(x):
     """
     Test if string x is a slice. If not a string return False.
     """
-    try:
+    with contextlib.suppress(AttributeError):
         x = x.strip("[]()")
-        m = SLICE_REG.fullmatch(x)
-        if m:
+        if m := SLICE_REG.fullmatch(x):
             return True
-    except AttributeError:
-        pass
     return False
 
 
@@ -1638,10 +1567,7 @@ def is_string_set(x):
 
 def csv_to_set(x):
     """Convert a comma-separated list of strings to a set of strings."""
-    if not x:
-        return set()
-    else:
-        return set(x.split(","))
+    return set(x.split(",")) if x else set()
 
 
 def set_to_csv(x):
@@ -1651,10 +1577,7 @@ def set_to_csv(x):
 
 def pathsep_to_set(x):
     """Converts a os.pathsep separated string to a set of strings."""
-    if not x:
-        return set()
-    else:
-        return set(x.split(os.pathsep))
+    return set(x.split(os.pathsep)) if x else set()
 
 
 def set_to_pathsep(x, sort=False):
@@ -1684,10 +1607,7 @@ def is_nonstring_seq_of_strings(x):
 
 def pathsep_to_seq(x):
     """Converts a os.pathsep separated string to a sequence of strings."""
-    if not x:
-        return []
-    else:
-        return x.split(os.pathsep)
+    return x.split(os.pathsep) if x else []
 
 
 def seq_to_pathsep(x):
@@ -1699,10 +1619,7 @@ def pathsep_to_upper_seq(x):
     """Converts a os.pathsep separated string to a sequence of
     uppercase strings.
     """
-    if not x:
-        return []
-    else:
-        return x.upper().split(os.pathsep)
+    return x.upper().split(os.pathsep) if x else []
 
 
 def seq_to_upper_pathsep(x):
@@ -1747,7 +1664,7 @@ def ptk2_color_depth_setter(x):
         msg = f'"{x}" is not a valid value for $PROMPT_TOOLKIT_COLOR_DEPTH. '
         warnings.warn(msg, RuntimeWarning)
         x = ""
-    if x == "" and "PROMPT_TOOLKIT_COLOR_DEPTH" in os_environ:
+    if not x and "PROMPT_TOOLKIT_COLOR_DEPTH" in os_environ:
         del os_environ["PROMPT_TOOLKIT_COLOR_DEPTH"]
     else:
         os_environ["PROMPT_TOOLKIT_COLOR_DEPTH"] = x
@@ -1766,9 +1683,7 @@ def to_completions_display_value(x):
         x = "none"
     elif x in {"multi", "true"}:
         x = "multi"
-    elif x in {"single", "readline"}:
-        pass
-    else:
+    elif x not in {"single", "readline"}:
         msg = f'"{x}" is not a valid value for $COMPLETIONS_DISPLAY. '
         msg += 'Using "multi".'
         warnings.warn(msg, RuntimeWarning)
@@ -1789,9 +1704,9 @@ def to_completion_mode(x):
     y = str(x).casefold().replace("_", "-")
     y = (
         "default"
-        if y in ("", "d", "xonsh", "none", "def")
+        if y in {"", "d", "xonsh", "none", "def"}
         else "menu-complete"
-        if y in ("m", "menu", "menu-completion")
+        if y in {"m", "menu", "menu-completion"}
         else y
     )
     if y not in CANONIC_COMPLETION_MODES:
@@ -1841,7 +1756,7 @@ def to_dict(x):
     except (ValueError, SyntaxError):
         msg = f'"{x}" can not be converted to Python dictionary.'
         warnings.warn(msg, RuntimeWarning)
-        x = dict()
+        x = {}
     return x
 
 
@@ -1853,15 +1768,13 @@ def to_tok_color_dict(x):
     if not is_tok_color_dict(x):
         msg = f'"{x}" can not be converted to Token:str dictionary.'
         warnings.warn(msg, RuntimeWarning)
-        x = dict()
+        x = {}
     return x
 
 
 def dict_to_str(x):
     """Converts a dictionary to a string"""
-    if not x or len(x) == 0:
-        return ""
-    return str(x)
+    return "" if not x or len(x) == 0 else str(x)
 
 
 # history validation
@@ -1940,23 +1853,19 @@ HISTORY_UNITS = LazyObject(
 
 def is_history_tuple(x):
     """Tests if something is a proper history value, units tuple."""
-    if (
+    return (
         isinstance(x, cabc.Sequence)
         and len(x) == 2
         and isinstance(x[0], (int, float))
         and x[1].lower() in CANON_HISTORY_UNITS
-    ):
-        return True
-    return False
+    )
 
 
 def is_regex(x):
     """Tests if something is a valid regular expression."""
-    try:
+    with contextlib.suppress(re.error):
         re.compile(x)
         return True
-    except re.error:
-        pass
     return False
 
 
@@ -1980,23 +1889,19 @@ def is_dynamic_cwd_width(x):
 def to_dynamic_cwd_tuple(x):
     """Convert to a canonical cwd_width tuple."""
     unit = "c"
-    if isinstance(x, str):
-        if x[-1] == "%":
-            x = x[:-1]
-            unit = "%"
-        else:
-            unit = "c"
-        return (float(x), unit)
-    else:
+    if not isinstance(x, str):
         return (float(x[0]), x[1])
+    if x[-1] == "%":
+        x = x[:-1]
+        unit = "%"
+    else:
+        unit = "c"
+    return (float(x), unit)
 
 
 def dynamic_cwd_tuple_to_str(x):
     """Convert a canonical cwd_width tuple to a string."""
-    if x[1] == "%":
-        return str(x[0]) + "%"
-    else:
-        return str(x[0])
+    return f"{str(x[0])}%" if x[1] == "%" else str(x[0])
 
 
 RE_HISTORY_TUPLE = LazyObject(
@@ -2038,12 +1943,11 @@ def format_color(string, **kwargs):
     """
     if hasattr(xsh.shell, "shell"):
         return xsh.shell.shell.format_color(string, **kwargs)
-    else:
-        # fallback for ANSI if shell is not yet initialized
-        from xonsh.ansi_colors import ansi_partial_color_format
+    # fallback for ANSI if shell is not yet initialized
+    from xonsh.ansi_colors import ansi_partial_color_format
 
-        style = xsh.env.get("XONSH_COLOR_STYLE")
-        return ansi_partial_color_format(string, style=style)
+    style = xsh.env.get("XONSH_COLOR_STYLE")
+    return ansi_partial_color_format(string, style=style)
 
 
 def print_color(string, **kwargs):
@@ -2117,9 +2021,7 @@ def _token_attr_from_stylemap(stylemap):
     else:
         style = ptk.styles.style_from_pygments_dict(stylemap)
         for token in stylemap:
-            style_str = "class:{}".format(
-                ptk.styles.pygments.pygments_token_to_classname(token)
-            )
+            style_str = f"class:{ptk.styles.pygments.pygments_token_to_classname(token)}"
             yield (token, style.get_attrs_for_style_str(style_str))
 
 
@@ -2140,7 +2042,7 @@ def _get_color_indexes(style_map):
             index = table.lookup_fg_color(attr.color)
             try:
                 rgb = (
-                    int(attr.color[0:2], 16),
+                    int(attr.color[:2], 16),
                     int(attr.color[2:4], 16),
                     int(attr.color[4:6], 16),
                 )
@@ -2175,7 +2077,9 @@ PTK_NEW_OLD_COLOR_MAP = LazyObject(
 
 # Map of new ansicolor names to old PTK1 names
 ANSICOLOR_NAMES_MAP = LazyObject(
-    lambda: {"ansi" + k: "#ansi" + v for k, v in PTK_NEW_OLD_COLOR_MAP.items()},
+    lambda: {
+        f"ansi{k}": f"#ansi{v}" for k, v in PTK_NEW_OLD_COLOR_MAP.items()
+    },
     globals(),
     "ANSICOLOR_NAMES_MAP",
 )
@@ -2257,7 +2161,7 @@ def ansicolors_to_ptk1_names(stylemap):
     modified_stylemap = {}
     for token, style_str in stylemap.items():
         for color, ptk1_color in ANSICOLOR_NAMES_MAP.items():
-            if "#" + color not in style_str:
+            if f"#{color}" not in style_str:
                 style_str = style_str.replace(color, ptk1_color)
         modified_stylemap[token] = style_str
     return modified_stylemap
@@ -2267,7 +2171,6 @@ def intensify_colors_for_cmd_exe(style_map):
     """Returns a modified style to where colors that maps to dark
     colors are replaced with brighter versions.
     """
-    modified_style = {}
     replace_colors = {
         1: "ansibrightcyan",  # subst blue with bright cyan
         2: "ansibrightgreen",  # subst green with bright green
@@ -2278,10 +2181,11 @@ def intensify_colors_for_cmd_exe(style_map):
     }
     if xsh.shell.shell_type == "prompt_toolkit1":
         replace_colors = ansicolors_to_ptk1_names(replace_colors)
-    for token, idx, _ in _get_color_indexes(style_map):
-        if idx in replace_colors:
-            modified_style[token] = replace_colors[idx]
-    return modified_style
+    return {
+        token: replace_colors[idx]
+        for token, idx, _ in _get_color_indexes(style_map)
+        if idx in replace_colors
+    }
 
 
 def intensify_colors_on_win_setter(enable):
@@ -2338,7 +2242,7 @@ _STRINGS = (
     _RE_STRING_SINGLE,
 )
 RE_BEGIN_STRING = LazyObject(
-    lambda: re.compile("(" + _RE_STRING_START + "(" + "|".join(_STRINGS) + "))"),
+    lambda: re.compile(f"({_RE_STRING_START}(" + "|".join(_STRINGS) + "))"),
     globals(),
     "RE_BEGIN_STRING",
 )
@@ -2444,7 +2348,7 @@ def check_for_partial_string(x):
     while match is not None:
         # add the start in
         start = match.start()
-        quote = match.group(0)
+        quote = match[0]
         lenquote = len(quote)
         current_index += start
         # store the starting index of the string, as well as the
@@ -2458,7 +2362,7 @@ def check_for_partial_string(x):
         # figure out what is inside the string
         continuer = RE_STRING_CONT[ender]
         contents = re.match(continuer, x)
-        inside = contents.group(0)
+        inside = contents[0]
         leninside = len(inside)
         current_index += contents.start() + leninside + len(ender)
         # if we are not at the end of the input string, add the ending index of
@@ -2592,7 +2496,7 @@ def globpath(
     )
     o = list(o)
     no_match = [] if return_empty else [s]
-    return o if len(o) != 0 else no_match
+    return o or no_match
 
 
 def _dotglobstr(s):
@@ -2603,7 +2507,7 @@ def _dotglobstr(s):
         dotted_s = dotted_s.replace("/.**/.*", "/**/.*")
         modified = True
     if dotted_s.startswith("*") and not dotted_s.startswith("**"):
-        dotted_s = "." + dotted_s
+        dotted_s = f".{dotted_s}"
         modified = True
     return dotted_s, modified
 
@@ -2650,10 +2554,8 @@ def iglobpath(s, ignore_case=False, sort_result=None, include_dotfiles=None):
 def ensure_timestamp(t, datetime_format=None):
     if isinstance(t, (int, float)):
         return t
-    try:
+    with contextlib.suppress(ValueError, TypeError):
         return float(t)
-    except (ValueError, TypeError):
-        pass
     if datetime_format is None:
         datetime_format = xsh.env["XONSH_DATETIME_FORMAT"]
     if isinstance(t, datetime.datetime):
@@ -2677,16 +2579,15 @@ def columnize(elems, width=80, newline="\n"):
     sizes = [len(e) + 1 for e in elems]
     total = sum(sizes)
     nelem = len(elems)
+    columns = [sizes]
     if total - 1 <= width:
         ncols = len(sizes)
         nrows = 1
-        columns = [sizes]
         last_longest_row = total
         enter_loop = False
     else:
         ncols = 1
         nrows = len(sizes)
-        columns = [sizes]
         last_longest_row = max(sizes)
         enter_loop = True
     while enter_loop:
@@ -2703,17 +2604,16 @@ def columnize(elems, width=80, newline="\n"):
             nrows = nelem // ncols
             break
     pad = (width - last_longest_row + ncols) // ncols
-    pad = pad if pad > 1 else 1
+    pad = max(pad, 1)
     data = [elems[i * nrows : (i + 1) * nrows] for i in range(ncols)]
     colwidths = [max(map(len, d)) + pad for d in data]
     colwidths[-1] -= pad
     row_t = "".join(["{{row[{i}]: <{{w[{i}]}}}}".format(i=i) for i in range(ncols)])
     row_t += newline
-    lines = [
+    return [
         row_t.format(row=row, w=colwidths)
         for row in itertools.zip_longest(*data, fillvalue="")
     ]
-    return lines
 
 
 ALIAS_KWARG_NAMES = frozenset(["args", "stdin", "stdout", "stderr", "spec", "stack"])
@@ -2790,17 +2690,13 @@ def deprecated(deprecated_in=None, removed_in=None):
 
 def _deprecated_message_suffix(deprecated_in, removed_in):
     if deprecated_in and removed_in:
-        message_suffix = " in version {} and will be removed in version {}".format(
-            deprecated_in, removed_in
-        )
-    elif deprecated_in and not removed_in:
-        message_suffix = f" in version {deprecated_in}"
-    elif not deprecated_in and removed_in:
-        message_suffix = f" and will be removed in version {removed_in}"
+        return f" in version {deprecated_in} and will be removed in version {removed_in}"
+    elif deprecated_in:
+        return f" in version {deprecated_in}"
+    elif removed_in:
+        return f" and will be removed in version {removed_in}"
     else:
-        message_suffix = None
-
-    return message_suffix
+        return None
 
 
 def _deprecated_error_on_expiration(name, removed_in):
@@ -2814,7 +2710,7 @@ def _deprecated_error_on_expiration(name, removed_in):
 
 def to_repr_pretty_(inst, p, cycle):
     name = f"{inst.__class__.__module__}.{inst.__class__.__name__}"
-    with p.group(0, name + "(", ")"):
+    with p.group(0, f"{name}(", ")"):
         if cycle:
             p.text("...")
         elif len(inst):

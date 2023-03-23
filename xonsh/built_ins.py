@@ -217,24 +217,18 @@ def subproc_uncaptured(*cmds, envs=None):
 def ensure_list_of_strs(x):
     """Ensures that x is a list of strings."""
     if isinstance(x, str):
-        rtn = [x]
+        return [x]
     elif isinstance(x, cabc.Sequence):
-        rtn = [i if isinstance(i, str) else str(i) for i in x]
+        return [i if isinstance(i, str) else str(i) for i in x]
     else:
-        rtn = [str(x)]
-    return rtn
+        return [str(x)]
 
 
 def ensure_str_or_callable(x):
     """Ensures that x is single string or function."""
     if isinstance(x, str) or callable(x):
         return x
-    if isinstance(x, bytes):
-        # ``os.fsdecode`` decodes using "surrogateescape" on linux and "strict" on windows.
-        # This is used to decode bytes for interfacing with the os, notably for command line arguments.
-        # See https://www.python.org/dev/peps/pep-0383/#specification
-        return os.fsdecode(x)
-    return str(x)
+    return os.fsdecode(x) if isinstance(x, bytes) else str(x)
 
 
 def list_of_strs_or_callables(x):
@@ -243,12 +237,11 @@ def list_of_strs_or_callables(x):
     This is called when using the ``@()`` operator to expand it's content.
     """
     if isinstance(x, (str, bytes)) or callable(x):
-        rtn = [ensure_str_or_callable(x)]
+        return [ensure_str_or_callable(x)]
     elif isinstance(x, cabc.Iterable):
-        rtn = list(map(ensure_str_or_callable, x))
+        return list(map(ensure_str_or_callable, x))
     else:
-        rtn = [ensure_str_or_callable(x)]
-    return rtn
+        return [ensure_str_or_callable(x)]
 
 
 def list_of_list_of_strs_outer_product(x):
@@ -266,10 +259,9 @@ def list_of_list_of_strs_outer_product(x):
 
 def eval_fstring_field(field):
     """Evaluates the argument in Xonsh context."""
-    res = XSH.execer.eval(
+    return XSH.execer.eval(
         field[0].strip(), glbs=globals(), locs=XSH.ctx, filename=field[1]
     )
-    return res
 
 
 @lazyobject
@@ -334,7 +326,7 @@ def convert_macro_arg(raw_arg, kind, glbs, locs, *, name="<arg>", macroname="<ma
         return raw_arg  # short circuit since there is nothing else to do
     # select from kind and convert
     execer = XSH.execer
-    filename = macroname + "(" + name + ")"
+    filename = f"{macroname}({name})"
     if kind is AST:
         ctx = set(dir(builtins)) | set(glbs.keys())
         if locs is not None:
@@ -449,15 +441,15 @@ def _eval_regular_args(raw_args, glbs, locs):
     execer = XSH.execer
     if not arglist:
         args = arglist
-        kwargstr = "dict({})".format(", ".join(kwarglist))
+        kwargstr = f'dict({", ".join(kwarglist)})'
         kwargs = execer.eval(kwargstr, glbs=glbs, locs=locs)
     elif not kwarglist:
-        argstr = "({},)".format(", ".join(arglist))
+        argstr = f'({", ".join(arglist)},)'
         args = execer.eval(argstr, glbs=glbs, locs=locs)
         kwargs = {}
     else:
-        argstr = "({},)".format(", ".join(arglist))
-        kwargstr = "dict({})".format(", ".join(kwarglist))
+        argstr = f'({", ".join(arglist)},)'
+        kwargstr = f'dict({", ".join(kwarglist)})'
         both = f"({argstr}, {kwargstr})"
         args, kwargs = execer.eval(both, glbs=glbs, locs=locs)
     return args, kwargs

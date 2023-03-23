@@ -234,9 +234,7 @@ class _TeeStd(io.TextIOBase):
 
     def isatty(self) -> bool:
         """delegate the method to the underlying io-wrapper"""
-        if self.std:  # it happens to be reset sometimes
-            return self.std.isatty()
-        return super().isatty()
+        return self.std.isatty() if self.std else super().isatty()
 
 
 class Tee:
@@ -367,11 +365,8 @@ class BaseShell:
     def default(self, line, raw_line=None):
         """Implements code execution."""
         line = line if line.endswith("\n") else line + "\n"
-        if not self.need_more_lines:  # this is the first line
-            if not raw_line:
-                self.src_starts_with_space = False
-            else:
-                self.src_starts_with_space = raw_line[0].isspace()
+        if not self.need_more_lines:
+            self.src_starts_with_space = raw_line[0].isspace() if raw_line else False
         src, code = self.push(line)
         if code is None:
             return
@@ -437,9 +432,9 @@ class BaseShell:
         last_out = hist.last_cmd_out if hist is not None else None
         if last_out is None and tee_out is None:
             pass
-        elif last_out is None and tee_out is not None:
+        elif last_out is None:
             info["out"] = tee_out
-        elif last_out is not None and tee_out is None:
+        elif tee_out is None:
             info["out"] = last_out
         else:
             info["out"] = tee_out + "\n" + last_out
@@ -463,13 +458,10 @@ class BaseShell:
             if pwd is None:
                 # we have no idea where we are
                 env["PWD"] = "<invalid directory>"
-            elif os.path.isdir(pwd):
-                # unclear why os.getcwd() failed. do nothing.
-                pass
-            else:
+            elif not os.path.isdir(pwd):
                 # OK PWD is really gone.
                 msg = "{UNDERLINE_INTENSE_WHITE}{BACKGROUND_INTENSE_BLACK}"
-                msg += "xonsh: working directory does not exist: " + pwd
+                msg += f"xonsh: working directory does not exist: {pwd}"
                 msg += "{RESET}"
                 self.print_color(msg, file=sys.stderr)
         elif "PWD" not in env:

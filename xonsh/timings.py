@@ -116,7 +116,7 @@ def format_time(timespan, precision=3):
             value = int(leftover / length)
             if value > 0:
                 leftover = leftover % length
-                time.append(f"{str(value)}{suffix}")
+                time.append(f"{value}{suffix}")
             if leftover < 1:
                 break
         return " ".join(time)
@@ -188,15 +188,11 @@ def timeit_alias(args, stdin=None):
     number = 0
     quiet = False
     repeat = 3
-    precision = 3
     # setup
     ctx = XSH.ctx
     timer = Timer(timer=clock)
     stmt = " ".join(args)
     innerstr = INNER_TEMPLATE.format(stmt=stmt)
-    # Track compilation time so it can be reported if too long
-    # Minimum time above which compilation time will be reported
-    tc_min = 0.1
     t0 = clock()
     innercode = XSH.builtins.compilex(
         innerstr, filename="<xonsh-timeit>", mode="exec", glbs=ctx
@@ -237,11 +233,13 @@ def timeit_alias(args, stdin=None):
                     "is being cached."
                 ).format(worst / best)
             )
+        precision = 3
         print(
-            "{} loops, best of {}: {} per loop".format(
-                number, repeat, format_time(best, precision)
-            )
+            f"{number} loops, best of {repeat}: {format_time(best, precision)} per loop"
         )
+        # Track compilation time so it can be reported if too long
+        # Minimum time above which compilation time will be reported
+        tc_min = 0.1
         if tc > tc_min:
             print(f"Compiler time: {tc:.2f} s")
     return

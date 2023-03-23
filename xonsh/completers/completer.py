@@ -86,8 +86,7 @@ def remove_completer(
     err = None
     if name not in XSH.completers:
         err = f"The name {name} is not a registered completer function."
-    if err is None:
-        del XSH.completers[name]
-        return
-    else:
+    if err is not None:
         return None, err + "\n", 1
+    del XSH.completers[name]
+    return

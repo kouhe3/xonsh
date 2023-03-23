@@ -21,12 +21,11 @@ skipwin311 = pytest.mark.skipif(
 
 @pytest.fixture
 def hist(tmpdir):
-    h = SqliteHistory(
+    yield SqliteHistory(
         filename=tmpdir / f"xonsh-HISTORY-TEST{next(hist_file_count)}.sqlite",
         sessionid=str(tmpdir / "SESSIONID"),
         gc=False,
     )
-    yield h
 
 
 def _clean_up(h):
@@ -84,19 +83,7 @@ CMDS = ["ls", "cat hello kitty", "abc", "def", "touch me", "grep from me"]
 
 
 @skipwin311
-@pytest.mark.parametrize(
-    "inp, commands, offset",
-    [
-        ("", CMDS, (0, 1)),
-        ("-r", list(reversed(CMDS)), (len(CMDS) - 1, -1)),
-        ("0", CMDS[0:1], (0, 1)),
-        ("1", CMDS[1:2], (1, 1)),
-        ("-2", CMDS[-2:-1], (len(CMDS) - 2, 1)),
-        ("1:3", CMDS[1:3], (1, 1)),
-        ("1::2", CMDS[1::2], (1, 2)),
-        ("-4:-2", CMDS[-4:-2], (len(CMDS) - 4, 1)),
-    ],
-)
+@pytest.mark.parametrize("inp, commands, offset", [("", CMDS, (0, 1)), ("-r", list(reversed(CMDS)), (len(CMDS) - 1, -1)), ("0", CMDS[:1], (0, 1)), ("1", CMDS[1:2], (1, 1)), ("-2", CMDS[-2:-1], (len(CMDS) - 2, 1)), ("1:3", CMDS[1:3], (1, 1)), ("1::2", CMDS[1::2], (1, 2)), ("-4:-2", CMDS[-4:-2], (len(CMDS) - 4, 1))])
 def test_show_cmd_numerate(inp, commands, offset, hist, xession, capsys):
     """Verify that CLI history commands work."""
     base_idx, step = offset
@@ -254,7 +241,7 @@ def test_history_getitem(index, exp, hist, xession):
     attrs = ("inp", "out", "rtn", "ts")
 
     for ts, cmd in enumerate(CMDS):  # populate the shell history
-        entry = {k: v for k, v in zip(attrs, [cmd, "out", 0, (ts, ts + 1)])}
+        entry = dict(zip(attrs, [cmd, "out", 0, (ts, ts + 1)]))
         hist.append(entry)
 
     entry = hist[index]
@@ -344,7 +331,7 @@ def test_hist_store_cwd(hist, xession):
     hist.save_cwd = False
     hist.append({"inp": "# saving without cwd", "rtn": 0, "out": "yes", "cwd": "/tmp"})
 
-    cmds = [i for i in hist.all_items()]
+    cmds = list(hist.all_items())
     assert cmds[0]["cwd"] == "/tmp"
     assert cmds[1]["cwd"] is None
 

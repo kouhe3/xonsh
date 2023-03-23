@@ -149,19 +149,7 @@ def test_cmd_field(hist, xession):
     assert hist.outs[-1] is None
 
 
-@pytest.mark.parametrize(
-    "inp, commands, offset",
-    [
-        ("", CMDS, (0, 1)),
-        ("-r", list(reversed(CMDS)), (len(CMDS) - 1, -1)),
-        ("0", CMDS[0:1], (0, 1)),
-        ("1", CMDS[1:2], (1, 1)),
-        ("-2", CMDS[-2:-1], (len(CMDS) - 2, 1)),
-        ("1:3", CMDS[1:3], (1, 1)),
-        ("1::2", CMDS[1::2], (1, 2)),
-        ("-4:-2", CMDS[-4:-2], (len(CMDS) - 4, 1)),
-    ],
-)
+@pytest.mark.parametrize("inp, commands, offset", [("", CMDS, (0, 1)), ("-r", list(reversed(CMDS)), (len(CMDS) - 1, -1)), ("0", CMDS[:1], (0, 1)), ("1", CMDS[1:2], (1, 1)), ("-2", CMDS[-2:-1], (len(CMDS) - 2, 1)), ("1:3", CMDS[1:3], (1, 1)), ("1::2", CMDS[1::2], (1, 2)), ("-4:-2", CMDS[-4:-2], (len(CMDS) - 4, 1))])
 def test_show_cmd_numerate(inp, commands, offset, hist, xession, capsys):
     """Verify that CLI history commands work."""
     base_idx, step = offset
@@ -362,7 +350,7 @@ def test_history_getitem(index, exp, hist, xession):
     attrs = ("inp", "out", "rtn", "ts")
 
     for ts, cmd in enumerate(CMDS):  # populate the shell history
-        entry = {k: v for k, v in zip(attrs, [cmd, "out", 0, (ts, ts + 1)])}
+        entry = dict(zip(attrs, [cmd, "out", 0, (ts, ts + 1)]))
         hist.append(entry)
 
     entry = hist[index]
@@ -390,22 +378,20 @@ def history_files_list(gen_count) -> (float, int, str, int):
 
     retval = []
     for i in range(int((gen_count + 1) / 2)):
-        retval.append(
+        retval.extend(
             (
-                # first day in sec + #days * 24hr + #hr * 60min + # sec * 60sec + sec= sec to date.
-                HF_FIRST_DAY + (((((i * 24) + 9) * 60) + 0) * 60) + 0,  # mod dt,
-                100,
-                f".argle/xonsh-{2*i:05n}.json",
-                10000,
-            )
-        )
-        retval.append(
-            (
-                # first day in sec + #days * 24hr + #hr * 60min + # sec * 60sec + sec= sec to date.
-                HF_FIRST_DAY + (((((i * 24) + 23) * 60) + 0) * 60) + 0,  # mod dt,
-                50,
-                f".argle/xonsh-{2*i+1:05n}.json",
-                2500,
+                (
+                    HF_FIRST_DAY + (((((i * 24) + 9) * 60) + 0) * 60) + 0,
+                    100,
+                    f".argle/xonsh-{2 * i:05n}.json",
+                    10000,
+                ),
+                (
+                    HF_FIRST_DAY + (((((i * 24) + 23) * 60) + 0) * 60) + 0,
+                    50,
+                    f".argle/xonsh-{2 * i + 1:05n}.json",
+                    2500,
+                ),
             )
         )
     return retval

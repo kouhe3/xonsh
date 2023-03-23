@@ -286,10 +286,7 @@ class StateFile(Input):
     @default_file.setter
     def default_file(self, val):
         self._df = val
-        if val is None:
-            self.prompt = "filename: "
-        else:
-            self.prompt = f"filename [default={val!r}]: "
+        self.prompt = "filename: " if val is None else f"filename [default={val!r}]: "
 
 
 class SaveJSON(StateFile):
@@ -395,7 +392,7 @@ class FileInserter(StateFile):
                 continue
             i, j = m.span()
             len_funcs.append((j - i, rule, func))
-        if len(len_funcs) == 0:
+        if not len_funcs:
             # No dump rule function for path
             return path, None
         len_funcs.sort(reverse=True, key=self._find_rule_key)
@@ -414,8 +411,7 @@ class FileInserter(StateFile):
             line = func(path, value)
             lines.append(line)
         lines.append(self.suffix)
-        new = "\n".join(lines) + "\n"
-        return new
+        return "\n".join(lines) + "\n"
 
 
 def create_truefalse_cond(prompt="yes or no [default: no]? ", path=None):
@@ -458,7 +454,7 @@ class Visitor:
         if node is None:
             raise RuntimeError("no node or tree given!")
         for clsname in map(_lowername, type.mro(node.__class__)):
-            meth = getattr(self, "visit_" + clsname, None)
+            meth = getattr(self, f"visit_{clsname}", None)
             if callable(meth):
                 rtn = meth(node)
                 break
@@ -479,9 +475,9 @@ class PrettyFormatter(Visitor):
         self.indent = indent
 
     def visit_node(self, node):
-        s = node.__class__.__name__ + "("
+        s = f"{node.__class__.__name__}("
         if len(node.attrs) == 0:
-            return s + ")"
+            return f"{s})"
         s += "\n"
         self.level += 1
         t = []
@@ -497,10 +493,7 @@ class PrettyFormatter(Visitor):
     def visit_wizard(self, node):
         s = "Wizard(children=["
         if len(node.children) == 0:
-            if node.path is None:
-                return s + "])"
-            else:
-                return s + f"], path={node.path!r})"
+            return f"{s}])" if node.path is None else f"{s}], path={node.path!r})"
         s += "\n"
         self.level += 1
         s += textwrap.indent(",\n".join(map(self.visit, node.children)), self.indent)
@@ -517,7 +510,7 @@ class PrettyFormatter(Visitor):
     def visit_question(self, node):
         s = node.__class__.__name__ + "(\n"
         self.level += 1
-        s += self.indent + f"question={node.question!r},\n"
+        s += f"{self.indent}question={node.question!r},\n"
         s += self.indent + "responses={"
         if len(node.responses) == 0:
             s += "}"
@@ -551,10 +544,12 @@ class PrettyFormatter(Visitor):
 
     def visit_statefile(self, node):
         s = "{0}(default_file={1!r}, check={2}, ask_filename={3})"
-        s = s.format(
-            node.__class__.__name__, node.default_file, node.check, node.ask_filename
+        return s.format(
+            node.__class__.__name__,
+            node.default_file,
+            node.check,
+            node.ask_filename,
         )
-        return s
 
     def visit_while(self, node):
         s = f"{node.__class__.__name__}(cond={node.cond!r}"
@@ -599,9 +594,7 @@ def canon_path(path, indices=None):
         path = path.format(**indices)
     path = path[1:] if path.startswith("/") else path
     path = path[:-1] if path.endswith("/") else path
-    if len(path) == 0:
-        return ()
-    return tuple(map(ensure_str_or_int, path.split("/")))
+    return () if len(path) == 0 else tuple(map(ensure_str_or_int, path.split("/")))
 
 
 class UnstorableType:
@@ -655,10 +648,7 @@ class StateVisitor(Visitor):
                 loc[p] = {} if isinstance(n, str) else []
             elif isinstance(p, int) and abs(p) + (p >= 0) > len(loc):
                 i = abs(p) + (p >= 0) - len(loc)
-                if isinstance(n, str):
-                    ex = [{} for _ in range(i)]
-                else:
-                    ex = [[] for _ in range(i)]
+                ex = [{} for _ in range(i)] if isinstance(n, str) else [[] for _ in range(i)]
                 loc.extend(ex)
             loc = loc[p]
         p = path[-1]
@@ -676,21 +666,19 @@ class StateVisitor(Visitor):
         value = self.state if value is None else value
         flat = {} if flat is None else flat
         if isinstance(value, cabc.Mapping):
-            path = path if path.endswith("/") else path + "/"
+            path = path if path.endswith("/") else f"{path}/"
             flat[path] = value
             for k, v in value.items():
                 p = path + k
                 self.flatten(path=p, value=v, flat=flat)
-        elif isinstance(value, (str, bytes)):
+        elif isinstance(value, (str, bytes)) or not isinstance(value, cabc.Sequence):
             flat[path] = value
-        elif isinstance(value, cabc.Sequence):
-            path = path if path.endswith("/") else path + "/"
+        else:
+            path = path if path.endswith("/") else f"{path}/"
             flat[path] = value
             for i, v in enumerate(value):
                 p = path + str(i)
                 self.flatten(path=p, value=v, flat=flat)
-        else:
-            flat[path] = value
         return flat
 
 
@@ -747,14 +735,13 @@ class PromptVisitor(StateVisitor):
                 except KeyboardInterrupt:
                     raise
                 except Exception:
-                    if node.retry:
-                        msg = (
-                            "{{BOLD_RED}}Invalid{{RESET}} input {0!r}, " "please retry."
-                        )
-                        print_color(msg.format(raw))
-                        continue
-                    else:
+                    if not node.retry:
                         raise
+                    msg = (
+                        "{{BOLD_RED}}Invalid{{RESET}} input {0!r}, " "please retry."
+                    )
+                    print_color(msg.format(raw))
+                    continue
                 if node.show_conversion and x is not Unstorable and str(x) != raw:
                     msg = "{{BOLD_PURPLE}}Converted{{RESET}} input {0!r} to {1!r}."
                     print_color(msg.format(raw, x))
@@ -796,14 +783,12 @@ class PromptVisitor(StateVisitor):
         if node.check:
             msg = "The current state is:\n\n{0}\n"
             print(msg.format(textwrap.indent(jstate, "    ")))
-            ap = "Would you like to save this state, " + YN
+            ap = f"Would you like to save this state, {YN}"
             asker = TrueFalse(prompt=ap)
             do_save = self.visit(asker)
             if not do_save:
                 return Unstorable
-        fname = None
-        if node.ask_filename:
-            fname = self.visit_input(node)
+        fname = self.visit_input(node) if node.ask_filename else None
         if fname is None or len(fname) == 0:
             fname = node.default_file
         if os.path.isfile(fname):
@@ -816,7 +801,7 @@ class PromptVisitor(StateVisitor):
 
     def visit_loadjson(self, node):
         if node.check:
-            ap = "Would you like to load an existing file, " + YN
+            ap = f"Would you like to load an existing file, {YN}"
             asker = TrueFalse(prompt=ap)
             do_load = self.visit(asker)
             if not do_load:
@@ -843,15 +828,12 @@ class PromptVisitor(StateVisitor):
         if node.check:
             msg = "The current state to insert is:\n\n{0}\n"
             print(msg.format(textwrap.indent(new, "    ")))
-            ap = "Would you like to write out the current state, " + YN
+            ap = f"Would you like to write out the current state, {YN}"
             asker = TrueFalse(prompt=ap)
             do_save = self.visit(asker)
             if not do_save:
                 return Unstorable
-        # get and backup the file.
-        fname = None
-        if node.ask_filename:
-            fname = self.visit_input(node)
+        fname = self.visit_input(node) if node.ask_filename else None
         if fname is None or len(fname) == 0:
             fname = node.default_file
         if os.path.isfile(fname):
@@ -862,8 +844,7 @@ class PromptVisitor(StateVisitor):
             backup_file(fname)
         else:
             before = after = ""
-            dname = os.path.dirname(fname)
-            if dname:
+            if dname := os.path.dirname(fname):
                 os.makedirs(dname, exist_ok=True)
         # write out the file
         with open(fname, "w") as f:

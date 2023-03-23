@@ -59,8 +59,7 @@ def module_list(path):
         # recurse more than one level into subdirectories.
         files = []
         for root, dirs, nondirs in os.walk(path, followlinks=True):
-            subdir = root[len(path) + 1 :]
-            if subdir:
+            if subdir := root[len(path) + 1 :]:
                 files.extend(pjoin(subdir, f) for f in nondirs)
                 dirs[:] = []  # Do not recurse into additional subdirectories.
             else:
@@ -75,8 +74,7 @@ def module_list(path):
     # Build a list of modules which match the import_re regex.
     modules = []
     for f in files:
-        m = IMPORT_RE.match(f)
-        if m:
+        if m := IMPORT_RE.match(f):
             modules.append(m.group("name"))
     return list(set(modules))
 
@@ -104,15 +102,14 @@ def get_root_modules():
                 print("\nwarning: Getting root modules is taking too long, we give up")
                 return []
         rootmodules.extend(modules)
-    rootmodules = list(set(rootmodules))
-    return rootmodules
+    return list(set(rootmodules))
 
 
 def is_importable(module, attr, only_modules):
     if only_modules:
         return inspect.ismodule(getattr(module, attr))
     else:
-        return not (attr[:2] == "__" and attr[-2:] == "__")
+        return attr[:2] != "__" or attr[-2:] != "__"
 
 
 def is_possible_submodule(module, attr):
@@ -151,9 +148,8 @@ def try_import(mod: str, only_modules=False) -> tp.List[str]:
     else:
         completions.extend(m_all)
 
-    if m_is_init:
-        if m.__file__:
-            completions.extend(module_list(os.path.dirname(m.__file__)))
+    if m_is_init and m.__file__:
+        completions.extend(module_list(os.path.dirname(m.__file__)))
     completions_set = {c for c in completions if isinstance(c, str)}
     completions_set.discard("__init__")
     return list(completions_set)

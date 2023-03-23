@@ -39,9 +39,10 @@ def _xh_sqlite_create_history_table(cursor):
         frequency - in case of HISTCONTROL=erasedups,
         it tracks the frequency of the inputs. helps in sorting autocompletion
     """
-    if not getattr(XH_SQLITE_CACHE, XH_SQLITE_CREATED_SQL_TBL, False):
-        cursor.execute(
-            """
+    if getattr(XH_SQLITE_CACHE, XH_SQLITE_CREATED_SQL_TBL, False):
+        return
+    cursor.execute(
+        """
             CREATE TABLE IF NOT EXISTS {}
                  (inp TEXT,
                   rtn INTEGER,
@@ -54,37 +55,35 @@ def _xh_sqlite_create_history_table(cursor):
                   cwd TEXT
                  )
         """.format(
-                XH_SQLITE_TABLE_NAME
-            )
+            XH_SQLITE_TABLE_NAME
         )
+    )
 
-        # add frequency column if not exists for backward compatibility
-        try:
-            cursor.execute(
-                "ALTER TABLE "
-                + XH_SQLITE_TABLE_NAME
-                + " ADD COLUMN frequency INTEGER default 1"
-            )
-        except sqlite3.OperationalError:
-            pass
+    # add frequency column if not exists for backward compatibility
+    try:
+        cursor.execute(
+            "ALTER TABLE "
+            + XH_SQLITE_TABLE_NAME
+            + " ADD COLUMN frequency INTEGER default 1"
+        )
+    except sqlite3.OperationalError:
+        pass
 
         # add path column if not exists for backward compatibility
-        try:
-            cursor.execute(
-                "ALTER TABLE " + XH_SQLITE_TABLE_NAME + " ADD COLUMN cwd TEXT"
-            )
-        except sqlite3.OperationalError:
-            pass
+    try:
+        cursor.execute(f"ALTER TABLE {XH_SQLITE_TABLE_NAME} ADD COLUMN cwd TEXT")
+    except sqlite3.OperationalError:
+        pass
 
-        # add index on inp. since we query when erasedups is True
-        cursor.execute(
-            f"""\
+    # add index on inp. since we query when erasedups is True
+    cursor.execute(
+        f"""\
 CREATE INDEX IF NOT EXISTS  idx_inp_history
 ON {XH_SQLITE_TABLE_NAME}(inp);"""
-        )
+    )
 
-        # mark that this function ran for this session
-        setattr(XH_SQLITE_CACHE, XH_SQLITE_CREATED_SQL_TBL, True)
+    # mark that this function ran for this session
+    setattr(XH_SQLITE_CACHE, XH_SQLITE_CREATED_SQL_TBL, True)
 
 
 def _xh_sqlite_get_frequency(cursor, input):
@@ -161,8 +160,10 @@ def _xh_sqlite_get_records(cursor, sessionid=None, limit=None, newest_first=Fals
 
 
 def _xh_sqlite_delete_records(cursor, size_to_keep):
-    sql = "SELECT min(tsb) FROM ("
-    sql += "SELECT tsb FROM xonsh_history ORDER BY tsb DESC "
+    sql = (
+        "SELECT min(tsb) FROM ("
+        + "SELECT tsb FROM xonsh_history ORDER BY tsb DESC "
+    )
     sql += "LIMIT %d)" % size_to_keep
     cursor.execute(sql)
     result = cursor.fetchone()
@@ -281,8 +282,7 @@ class SqliteHistory(History):
 
         if not os.path.exists(self.filename):
             with _xh_sqlite_get_conn(filename=self.filename) as conn:
-                if conn:
-                    pass
+                pass
             try:
                 os.chmod(self.filename, 0o600)
             except Exception:  # pylint: disable=broad-except

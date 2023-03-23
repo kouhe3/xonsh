@@ -92,6 +92,5 @@ class ModuleFinder:
             for base in self._pkgs:
                 with contextlib.suppress(ModuleNotFoundError):
                     return importlib.import_module(f"{base}.{name}")
-        file = self._find_file_path(module)
-        if file:
+        if file := self._find_file_path(module):
             return self.import_module(file, module)

@@ -119,7 +119,7 @@ def setup_readline():
     readline.parse_and_bind('"\\e[B": history-search-forward')
     readline.parse_and_bind('"\\e[A": history-search-backward')
     # Setup Shift-Tab to indent
-    readline.parse_and_bind('"\\e[Z": "{}"'.format(env.get("INDENT")))
+    readline.parse_and_bind(f'"\\e[Z": "{env.get("INDENT")}"')
 
     # handle tab completion differences found in libedit readline compatibility
     # as discussed at http://stackoverflow.com/a/7116997
@@ -148,10 +148,7 @@ def setup_readline():
     # try to load custom user settings
     inputrc_name = os_environ.get("INPUTRC")
     if inputrc_name is None:
-        if uses_libedit:
-            inputrc_name = ".editrc"
-        else:
-            inputrc_name = ".inputrc"
+        inputrc_name = ".editrc" if uses_libedit else ".inputrc"
         inputrc_name = os.path.join(os.path.expanduser("~"), inputrc_name)
     if (not ON_WINDOWS) and (not os.path.isfile(inputrc_name)):
         inputrc_name = "/etc/inputrc"
@@ -300,10 +297,7 @@ def _render_completions(completions, prefix, prefix_len):
     rendered_completions = []
     for comp in completions:
         if isinstance(comp, xct.RichCompletion) and comp.prefix_len is not None:
-            if comp.prefix_len:
-                comp = prefix[: -comp.prefix_len] + comp
-            else:
-                comp = prefix + comp
+            comp = prefix[: -comp.prefix_len] + comp if comp.prefix_len else prefix + comp
         elif chopped:
             comp = chopped + comp
         rendered_completions.append(comp)
@@ -545,7 +539,7 @@ class ReadlineShell(BaseShell, cmd.Cmd):
             if self.use_rawinput and self.completekey:
                 self.old_completer = readline.get_completer()
                 readline.set_completer(self.complete)
-                readline.parse_and_bind(self.completekey + ": complete")
+                readline.parse_and_bind(f"{self.completekey}: complete")
             have_readline = True
         except ImportError:
             have_readline = False
@@ -583,10 +577,7 @@ class ReadlineShell(BaseShell, cmd.Cmd):
                         os.write(self.stdin.fileno(), line.encode())
                     if not exec_now:
                         line = self.stdin.readline()
-                    if len(line) == 0:
-                        line = "EOF"
-                    else:
-                        line = line.rstrip("\r\n")
+                    line = "EOF" if len(line) == 0 else line.rstrip("\r\n")
                     if have_readline and line != "EOF":
                         readline.add_history(line)
                 if not ON_WINDOWS:
@@ -696,7 +687,7 @@ class ReadlineShell(BaseShell, cmd.Cmd):
         # under the covers. This effectively hides the true TTY stdin handle
         # from stty. To get around this we have to use the lower level
         # os.system() function.
-        os.system(stty + " sane")
+        os.system(f"{stty} sane")
 
 
 class ReadlineHistoryAdder(threading.Thread):

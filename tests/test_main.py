@@ -337,7 +337,7 @@ def test_rc_with_failing_module(shell, tmpdir, monkeypatch, capsys, xession):
 
 def test_no_rc_with_script(shell, tmpdir):
     args = xonsh.main.premain(["tests/sample.xsh"])
-    assert not (args.mode == XonshMode.interactive)
+    assert args.mode != XonshMode.interactive
 
 
 def test_force_interactive_rc_with_script(shell, tmpdir, xession):
@@ -364,7 +364,7 @@ def test_custom_rc_with_script(shell, tmpdir):
     f = tmpdir.join("wakkawakka")
     f.write("print('hi')")
     args = xonsh.main.premain(["--rc", f.strpath, "tests/sample.xsh"])
-    assert not (args.mode == XonshMode.interactive)
+    assert args.mode != XonshMode.interactive
 
 
 def test_premain_no_rc(shell, tmpdir, xession):
@@ -458,7 +458,7 @@ def test_xonsh_failback(
         if len(e.args) and "A fake failure" in str(
             e.args[0]
         ):  # if it did raise expected exception
-            assert len(failback_checker) == 0  # then it didn't invoke a shell
+            assert not failback_checker
         else:
             raise e  # it raised something other than the test exception,
 
@@ -491,7 +491,7 @@ def test_xonsh_failback_script_from_file(shell, monkeypatch, monkeypatch_stderr)
     # changed in #4662: User-Code exceptions are now caught in main and handled there
     # => we expect that no exception is thrown
 
-    assert len(checker) == 0
+    assert not checker
 
 
 def test_xonsh_no_file_returncode(shell, monkeypatch, monkeypatch_stderr):

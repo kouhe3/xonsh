@@ -188,9 +188,7 @@ class Shell:
                 shell_type = "readline"
             if init_shell_type in ("ptk1", "prompt_toolkit1"):
                 warnings.warn(
-                    "$SHELL_TYPE='{}' now deprecated, please update your run control file'".format(
-                        init_shell_type
-                    )
+                    f"$SHELL_TYPE='{init_shell_type}' now deprecated, please update your run control file'"
                 )
         return shell_type
 
@@ -199,17 +197,16 @@ class Shell:
         """Construct the history backend object."""
         if is_class(backend):
             cls = backend
+        elif backend == "none":
+            from xonsh.base_shell import BaseShell as cls
+        elif backend == "prompt_toolkit":
+            from xonsh.ptk_shell.shell import PromptToolkitShell as cls
+        elif backend == "readline":
+            from xonsh.readline_shell import ReadlineShell as cls
+        elif backend == "dumb":
+            from xonsh.dumb_shell import DumbShell as cls
         else:
-            if backend == "none":
-                from xonsh.base_shell import BaseShell as cls
-            elif backend == "prompt_toolkit":
-                from xonsh.ptk_shell.shell import PromptToolkitShell as cls
-            elif backend == "readline":
-                from xonsh.readline_shell import ReadlineShell as cls
-            elif backend == "dumb":
-                from xonsh.dumb_shell import DumbShell as cls
-            else:
-                raise XonshError(f"{backend} is not recognized as a shell type")
+            raise XonshError(f"{backend} is not recognized as a shell type")
         return cls(**kwargs)
 
     def __init__(self, execer, ctx=None, shell_type=None, **kwargs):

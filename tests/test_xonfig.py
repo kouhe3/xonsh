@@ -70,7 +70,7 @@ def get_req(request_factory):
 
     def factory(path, data: "dict[str, str]|None" = None):
         if data:
-            path = path + "?" + parse.urlencode(data)
+            path = f"{path}?{parse.urlencode(data)}"
         request = request_factory(path, "get")
         handle = web_main.XonshConfigHTTPRequestHandler(request, (0, 0), None)
         return request, handle, request.data.decode()

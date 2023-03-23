@@ -137,9 +137,7 @@ PATTERN_BIN_USING_TTY_OR_NOT = [
 def test_commands_cache_predictor_default(args, xession, tmp_path):
     use_tty, patterns = args
     file = tmp_path / "testfile"
-    where = list(patterns.keys())
-    where.sort()
-
+    where = sorted(patterns.keys())
     with file.open("wb") as f:
         pos = 0
         for w in where:

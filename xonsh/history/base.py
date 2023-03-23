@@ -108,8 +108,7 @@ class History:
             ]
         else:
             raise TypeError(
-                "history indices must be integers "
-                "or slices, not {}".format(type(item))
+                f"history indices must be integers or slices, not {type(item)}"
             )
 
     def __setitem__(self, *args):
@@ -177,8 +176,7 @@ class History:
     @functools.cached_property
     def ignore_regex(self):
         compiled_regex = None
-        regex = XSH.env.get("XONSH_HISTORY_IGNORE_REGEX")
-        if regex:
+        if regex := XSH.env.get("XONSH_HISTORY_IGNORE_REGEX"):
             try:
                 compiled_regex = re.compile(regex)
             except re.error:

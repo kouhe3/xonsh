@@ -47,7 +47,6 @@ def token_map():
     Otherwise, it will fall back to handling that token using one of the
     handlers in``special_handlers``.
     """
-    tm = {}
     # operators
     _op_map = {
         # punctuation
@@ -98,8 +97,7 @@ def token_map():
         "@$": "ATDOLLAR",
         "&": "AMPERSAND",
     }
-    for op, typ in _op_map.items():
-        tm[(OP, op)] = typ
+    tm = {(OP, op): typ for op, typ in _op_map.items()}
     tm[IOREDIRECT] = "IOREDIRECT"
     tm[STRING] = "STRING"
     tm[DOLLARNAME] = "DOLLAR_NAME"
@@ -139,26 +137,24 @@ def handle_name(state, token):
         elif token.string in kwmod.kwlist + ["match", "case"]:
             typ = token.string.upper()
         yield _new_token(typ, token.string, token.start)
+    elif has_whitespace and token.string == "and":
+        yield _new_token("AND", token.string, token.start)
+    elif has_whitespace and token.string == "or":
+        yield _new_token("OR", token.string, token.start)
     else:
-        if has_whitespace and token.string == "and":
-            yield _new_token("AND", token.string, token.start)
-        elif has_whitespace and token.string == "or":
-            yield _new_token("OR", token.string, token.start)
-        else:
-            yield _new_token("NAME", token.string, token.start)
+        yield _new_token("NAME", token.string, token.start)
 
 
 def _end_delimiter(state, token):
     py = state["pymode"]
     s = token.string
     l, c = token.start
-    if len(py) > 1:
-        mode, orig, match, pos = py.pop()
-        if s != match:
-            e = '"{}" at {} ends "{}" at {} (expected "{}")'
-            return e.format(s, (l, c), orig, pos, match)
-    else:
+    if len(py) <= 1:
         return f'Unmatched "{s}" at line {l}, column {c}'
+    mode, orig, match, pos = py.pop()
+    if s != match:
+        e = '"{}" at {} ends "{}" at {} (expected "{}")'
+        return e.format(s, (l, c), orig, pos, match)
 
 
 def handle_rparen(state, token):
@@ -342,12 +338,15 @@ def handle_token(state, token):
     typ = token.type
     st = token.string
     pymode = state["pymode"][-1][0]
-    if not pymode:
-        if state["last"] is not None and state["last"].end != token.start:
-            cur = token.start
-            old = state["last"].end
-            if cur[0] == old[0] and cur[1] > old[1]:
-                yield _new_token("WS", token.line[old[1] : cur[1]], old)
+    if (
+        not pymode
+        and state["last"] is not None
+        and state["last"].end != token.start
+    ):
+        cur = token.start
+        old = state["last"].end
+        if cur[0] == old[0] and cur[1] > old[1]:
+            yield _new_token("WS", token.line[old[1] : cur[1]], old)
     if (typ, st) in special_handlers:
         yield from special_handlers[(typ, st)](state, token)
     elif (typ, st) in token_map:

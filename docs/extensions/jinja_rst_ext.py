@@ -28,7 +28,7 @@ def rstjinja(app, docname, source):
         ctx = {
             "rst": rst_helpers,
         }
-        ctx.update(page_ctx)
+        ctx |= page_ctx
         environment = jinja2.Environment(
             trim_blocks=True,
             lstrip_blocks=True,

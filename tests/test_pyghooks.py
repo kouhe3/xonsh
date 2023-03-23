@@ -233,10 +233,7 @@ def colorizable_files():
         for k, v in _cf.items():
             if v is None:
                 continue
-            if v.startswith("/"):
-                file_path = v
-            else:
-                file_path = tempdir + "/" + v
+            file_path = v if v.startswith("/") else f"{tempdir}/{v}"
             try:
                 os.lstat(file_path)
             except FileNotFoundError:
@@ -250,12 +247,12 @@ def colorizable_files():
                     os.chmod(file_path, stat.S_IRWXU)  # tmpdir on windows need u+w
                 elif k == "ln":  # cook ln test case.
                     os.chmod(file_path, stat.S_IRWXU)  # link to *executable* file
-                    os.rename(file_path, file_path + "_target")
-                    os.symlink(file_path + "_target", file_path)
+                    os.rename(file_path, f"{file_path}_target")
+                    os.symlink(f"{file_path}_target", file_path)
                 elif k == "or":
-                    os.rename(file_path, file_path + "_target")
-                    os.symlink(file_path + "_target", file_path)
-                    os.remove(file_path + "_target")
+                    os.rename(file_path, f"{file_path}_target")
+                    os.symlink(f"{file_path}_target", file_path)
+                    os.remove(f"{file_path}_target")
                 elif k == "pi":  # not on Windows
                     os.remove(file_path)
                     os.mkfifo(file_path)
@@ -275,16 +272,11 @@ def colorizable_files():
                 elif k == "ow":
                     os.chmod(file_path, stat.S_IWOTH | stat.S_IRUSR | stat.S_IWUSR)
                 elif k == "mh":
-                    os.rename(file_path, file_path + "_target")
-                    os.link(file_path + "_target", file_path)
-                else:
-                    pass  # cauterize those elseless ifs!
-
-                os.symlink(file_path, file_path + "_symlink")
+                    os.rename(file_path, f"{file_path}_target")
+                    os.link(f"{file_path}_target", file_path)
+                os.symlink(file_path, f"{file_path}_symlink")
 
         yield tempdir
-
-    pass  # tempdir get cleaned up here.
 
 
 @pytest.mark.parametrize(
@@ -293,7 +285,7 @@ def colorizable_files():
 )
 def test_colorize_file(key, file_path, colorizable_files, xs_LS_COLORS):
     """test proper file codes with symlinks colored normally"""
-    ffp = colorizable_files + "/" + file_path
+    ffp = f"{colorizable_files}/{file_path}"
     stat_result = os.lstat(ffp)
     color_token, color_key = color_file(ffp, stat_result)
     assert color_key == key, "File classified as expected kind"
@@ -307,7 +299,7 @@ def test_colorize_file(key, file_path, colorizable_files, xs_LS_COLORS):
 def test_colorize_file_symlink(key, file_path, colorizable_files, xs_LS_COLORS):
     """test proper file codes with symlinks colored target."""
     xs_LS_COLORS.env["LS_COLORS"]["ln"] = "target"
-    ffp = colorizable_files + "/" + file_path + "_symlink"
+    ffp = f"{colorizable_files}/{file_path}_symlink"
     stat_result = os.lstat(ffp)
     assert stat.S_ISLNK(stat_result.st_mode)
 
@@ -337,7 +329,7 @@ def test_colorize_file_ca(xs_LS_COLORS, monkeypatch):
     monkeypatch.setattr(xonsh.pyghooks, "os_listxattr", mock_os_listxattr)
 
     with TemporaryDirectory() as tmpdir:
-        file_path = tmpdir + "/cap_file"
+        file_path = f"{tmpdir}/cap_file"
         open(file_path, "a").close()
         os.chmod(
             file_path, stat.S_IRWXU

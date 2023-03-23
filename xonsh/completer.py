@@ -164,7 +164,7 @@ class Completer:
             and not completion.value.endswith(" ")
         ):
             # append spaces AFTER appending closing quote
-            completion = completion.replace(value=completion.value + " ")
+            completion = completion.replace(value=f"{completion.value} ")
 
         return completion, lprefix
 
@@ -180,9 +180,9 @@ class Completer:
                     if completion_context is None:
                         continue
                     out = func(completion_context)
+                elif old_completer_args is None:
+                    continue
                 else:
-                    if old_completer_args is None:
-                        continue
                     out = func(*old_completer_args)
             except StopIteration:
                 # completer requested to stop collecting completions

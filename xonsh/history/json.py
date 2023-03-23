@@ -42,11 +42,8 @@ def _xhj_gc_commands_to_rmfiles(hsize, files):
         ncmds += fcmds
         n += 1
 
-    cmds_removed = 0
     files_removed = files[:-n]
-    for _, fcmds, _, _ in files_removed:
-        cmds_removed += fcmds
-
+    cmds_removed = sum(fcmds for _, fcmds, _, _ in files_removed)
     return cmds_removed, files_removed
 
 
@@ -80,11 +77,8 @@ def _xhj_gc_bytes_to_rmfiles(hsize, files):
             break
         nbytes += fsize
         n += 1
-    bytes_removed = 0
     files_removed = files[:-n]
-    for _, _, _, fsize in files_removed:
-        bytes_removed += fsize
-
+    bytes_removed = sum(fsize for _, _, _, fsize in files_removed)
     return bytes_removed, files_removed
 
 
@@ -123,8 +117,7 @@ def _xhj_get_history_files(sort=True, newest_first=False):
     if sort:
         files.sort(key=lambda x: os.path.getmtime(x), reverse=newest_first)
 
-    custom_history_file = XSH.env.get("XONSH_HISTORY_FILE", None)
-    if custom_history_file:
+    if custom_history_file := XSH.env.get("XONSH_HISTORY_FILE", None):
         custom_history_file = xt.expanduser_abs_path(custom_history_file)
         if custom_history_file not in files:
             files.insert(0, custom_history_file)
@@ -173,8 +166,7 @@ class JsonHistoryGC(threading.Thread):
             hist.hist_units = units
 
         if self.force_gc or size_over < hsize:
-            i = 0
-            for _, _, f, _ in rm_files:
+            for i, (_, _, f, _) in enumerate(rm_files):
                 try:
                     os.remove(f)
                     if xonsh_debug:
@@ -182,10 +174,8 @@ class JsonHistoryGC(threading.Thread):
                             f"... Deleted {i:7d} of {len(rm_files):7d} history files.\r",
                             end="",
                         )
-                    pass
                 except OSError:
                     pass
-                i += 1
         else:
             print(
                 f"Warning: History garbage collection would discard more history ({size_over} {units}) than it would keep ({hsize}).\n"
@@ -471,8 +461,7 @@ class JsonHistory(History):
             return
 
         opts = XSH.env.get("HISTCONTROL", "")
-        skipped_by_ignore_space = "ignorespace" in opts and cmd.get("spc")
-        if skipped_by_ignore_space:
+        if skipped_by_ignore_space := "ignorespace" in opts and cmd.get("spc"):
             return None
 
         self.buffer.append(cmd)
@@ -486,11 +475,7 @@ class JsonHistory(History):
         except KeyError:
             pass
 
-        if len(self.buffer) >= self.buffersize:
-            hf = self.flush()
-        else:
-            hf = None
-        return hf
+        return self.flush() if len(self.buffer) >= self.buffersize else None
 
     def flush(self, at_exit=False):
         """Flushes the current command buffer to disk.

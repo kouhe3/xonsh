@@ -126,7 +126,7 @@ def find_xontrib(name, full_module=False):
         return importlib.util.find_spec(autoloaded[name])
 
     with contextlib.suppress(ValueError):
-        return importlib.util.find_spec("." + name, package="xontrib")
+        return importlib.util.find_spec(f".{name}", package="xontrib")
 
     return importlib.util.find_spec(name)
 
@@ -175,7 +175,7 @@ def update_context(name, ctx: dict, full_module=False):
     if modctx is None:
         raise XontribNotInstalled(f"Xontrib - {name} is not found.")
     else:
-        ctx.update(modctx)
+        ctx |= modctx
     return ctx
 
 
@@ -296,15 +296,15 @@ def xontribs_reload(
 
 def xontrib_data():
     """Collects and returns the data about installed xontribs."""
-    data = {}
-    for xo_name, xontrib in get_xontribs().items():
-        data[xo_name] = {
+    data = {
+        xo_name: {
             "name": xo_name,
             "loaded": xontrib.is_loaded,
             "auto": xontrib.is_auto_loaded,
             "module": xontrib.module,
         }
-
+        for xo_name, xontrib in get_xontribs().items()
+    }
     return dict(sorted(data.items()))
 
 
@@ -332,10 +332,7 @@ def xontribs_list(to_json=False):
             s += "{PURPLE}" + name + "{RESET}  " + " " * (nname - len(name))
             if d["loaded"]:
                 s += "{GREEN}loaded{RESET}" + " " * 4
-                if d["auto"]:
-                    s += "  {GREEN}auto{RESET}"
-                elif d["loaded"]:
-                    s += "  {CYAN}manual{RESET}"
+                s += "  {GREEN}auto{RESET}" if d["auto"] else "  {CYAN}manual{RESET}"
             else:
                 s += "{RED}not-loaded{RESET}"
             s += "\n"
@@ -347,9 +344,9 @@ def _get_xontrib_entrypoints() -> "tp.Iterable[EntryPoint]":
 
     name = "xonsh.xontribs"
     entries = metadata.entry_points()
-    # for some reason, on CI (win py3.8) atleast, returns dict
-    group = entries.select(group=name) if hasattr(entries, "select") else entries.get(name, [])  # type: ignore
-    yield from group
+    yield from entries.select(group=name) if hasattr(
+        entries, "select"
+    ) else entries.get(name, [])
 
 
 def auto_load_xontribs_from_entrypoints(

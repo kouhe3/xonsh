@@ -124,9 +124,8 @@ def test_format_prompt_with_various_prepost(formatter, xession, live_fields, pre
 
     xession.env["VIRTUAL_ENV"] = "env"
 
-    lf_copy = dict(live_fields)  # live_fields fixture is not idempotent!
-    lf_copy.update({"env_prefix": pre, "env_postfix": post})
-    exp = pre + "env" + post
+    lf_copy = dict(live_fields) | {"env_prefix": pre, "env_postfix": post}
+    exp = f"{pre}env{post}"
     assert formatter("{env_name}", fields=lf_copy) == exp
 
 

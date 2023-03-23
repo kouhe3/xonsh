@@ -4,10 +4,7 @@ import re
 
 def underline_title(title: str, level: int = -1):
     symbols = "-.^"
-    if level < len(symbols):
-        under = symbols[level]
-    else:
-        under = symbols[-1]
+    under = symbols[level] if level < len(symbols) else symbols[-1]
     return under * len(title)
 
 
@@ -24,11 +21,9 @@ def indent_depth(depth: int = None):
 
 
 def to_ref_string(title: str, underline=False, depth=-1) -> str:
-    title = str(title)
+    title = title
     ref = f":ref:`{to_valid_name(title)} <{to_valid_id(title)}>`"
-    if underline:
-        return "\n".join([ref, underline_title(ref, depth)])
-    return ref
+    return "\n".join([ref, underline_title(ref, depth)]) if underline else ref
 
 
 def iterator_for_divmod(iterable, div: int = 3):

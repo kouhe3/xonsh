@@ -59,7 +59,7 @@ class Parser(ThreeSixParser):
             # x=42
             p0.posonlyargs.append(p1)
             p0.defaults.append(p2)
-        elif p2 is None and p3 is not None:
+        elif p2 is None:
             # x, y and x, y=42
             p0.posonlyargs.append(p1)
             self._set_posonly_args_def(p0, p3)

@@ -110,7 +110,7 @@ def test_lazy_list_ints():
     lj = LazyJSON(f)
     assert 28 == lj[3]
     assert x[:2:-2] == lj[:2:-2]
-    assert x == [_ for _ in lj]
+    assert x == list(lj)
     assert x == lj.load()
 
 
@@ -122,7 +122,7 @@ def test_lazy_list_str():
     lj = LazyJSON(f)
     assert "the" == lj[3]
     assert x[:2:-2] == lj[:2:-2]
-    assert x == [_ for _ in lj]
+    assert x == list(lj)
     assert x == lj.load()
 
 
@@ -134,7 +134,6 @@ def test_lazy_list_list_ints():
     lj = LazyJSON(f)
     assert isinstance(lj[1], LJNode)
     assert 28 == lj[1][1]
-    assert [6 == 28], lj[1].load()
     assert x == lj.load()
 
 

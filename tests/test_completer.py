@@ -49,7 +49,7 @@ def test_cursor_after_closing_quote(completer, completers_mock):
 
     @contextual_command_completer
     def comp(context: CommandContext):
-        return {context.prefix + "1", context.prefix + "2"}
+        return {f"{context.prefix}1", f"{context.prefix}2"}
 
     completers_mock["a"] = comp
 
@@ -68,14 +68,15 @@ def test_cursor_after_closing_quote_override(completer, completers_mock):
     @contextual_command_completer
     def comp(context: CommandContext):
         return {
-            # replace the closing quote with "a"
             RichCompletion(
-                "a", prefix_len=len(context.closing_quote), append_closing_quote=False
+                "a",
+                prefix_len=len(context.closing_quote),
+                append_closing_quote=False,
             ),
-            # add text after the closing quote
-            RichCompletion(context.prefix + "_no_quote", append_closing_quote=False),
-            # sanity
-            RichCompletion(context.prefix + "1"),
+            RichCompletion(
+                f"{context.prefix}_no_quote", append_closing_quote=False
+            ),
+            RichCompletion(f"{context.prefix}1"),
         }
 
     completers_mock["a"] = comp
@@ -107,10 +108,12 @@ def test_append_space(completer, completers_mock):
     @contextual_command_completer
     def comp(context: CommandContext):
         return {
-            RichCompletion(context.prefix + "a", append_space=True),
-            RichCompletion(context.prefix + " ", append_space=False),  # bad usage
+            RichCompletion(f"{context.prefix}a", append_space=True),
+            RichCompletion(f"{context.prefix} ", append_space=False),
             RichCompletion(
-                context.prefix + "b", append_space=True, append_closing_quote=False
+                f"{context.prefix}b",
+                append_space=True,
+                append_closing_quote=False,
             ),
         }
 

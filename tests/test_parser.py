@@ -2946,7 +2946,7 @@ WITH_BANG_RAWSUITES = [
 
 @pytest.mark.parametrize("body", WITH_BANG_RAWSUITES)
 def test_withbang_single_suite(body, check_xonsh_ast):
-    code = "with! x:\n{}".format(textwrap.indent(body, "    "))
+    code = f'with! x:\n{textwrap.indent(body, "    ")}'
     tree = check_xonsh_ast({}, code, False, return_obs=True, mode="exec")
     assert isinstance(tree, AST)
     wither = tree.body[0]
@@ -2961,7 +2961,7 @@ def test_withbang_single_suite(body, check_xonsh_ast):
 
 @pytest.mark.parametrize("body", WITH_BANG_RAWSUITES)
 def test_withbang_as_single_suite(body, check_xonsh_ast):
-    code = "with! x as y:\n{}".format(textwrap.indent(body, "    "))
+    code = f'with! x as y:\n{textwrap.indent(body, "    ")}'
     tree = check_xonsh_ast({}, code, False, return_obs=True, mode="exec")
     assert isinstance(tree, AST)
     wither = tree.body[0]
@@ -2977,7 +2977,7 @@ def test_withbang_as_single_suite(body, check_xonsh_ast):
 
 @pytest.mark.parametrize("body", WITH_BANG_RAWSUITES)
 def test_withbang_single_suite_trailing(body, check_xonsh_ast):
-    code = "with! x:\n{}\nprint(x)\n".format(textwrap.indent(body, "    "))
+    code = f'with! x:\n{textwrap.indent(body, "    ")}\nprint(x)\n'
     tree = check_xonsh_ast(
         {},
         code,

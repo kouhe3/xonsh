@@ -85,9 +85,7 @@ class CommandContext(NamedTuple):
 
     @property
     def command(self):
-        if self.args:
-            return self.args[0].raw_value
-        return None
+        return self.args[0].raw_value if self.args else None
 
     @property
     def words_before_cursor(self) -> str:
@@ -97,7 +95,7 @@ class CommandContext(NamedTuple):
     @property
     def text_before_cursor(self) -> str:
         """full text before cursor including prefix"""
-        return self.words_before_cursor + " " + self.prefix
+        return f"{self.words_before_cursor} {self.prefix}"
 
     @property
     def begidx(self) -> int:
@@ -293,11 +291,7 @@ def LINE_CONT_REPLACEMENT_DIFF():
     Diff is the diff in length for each replacement.
     """
     line_cont = get_line_continuation()
-    if " \\" == line_cont:
-        # interactive windows
-        replacement = " "
-    else:
-        replacement = ""
+    replacement = " " if line_cont == " \\" else ""
     line_cont += "\n"
     return line_cont, replacement, len(replacement) - len(line_cont)
 
@@ -510,9 +504,8 @@ class CompletionContextParser:
                         # TODO: False for connecting keywords other than '\n' and ';'
                         context_is_main_command = True
                         break
-            else:
-                if context is spanned.value:
-                    context_is_main_command = True
+            elif context is spanned.value:
+                context_is_main_command = True
 
             if context_is_main_command:
                 python_context = PythonContext(
@@ -623,15 +616,13 @@ class CompletionContextParser:
         inner_start = outer_start + len(sub_expr_opening)
 
         commands: Commands
+        # LPAREN commands RPAREN
+        commands = p[2]
         if len(p) == 4:
-            # LPAREN commands RPAREN
-            commands = p[2]
             inner_stop = p.lexpos(3)
             outer_stop = inner_stop + len(p[3])
             closed_parens = True
         else:
-            # LPAREN commands
-            commands = p[2]
             if commands.span is EMPTY_SPAN:  # an empty command without a location
                 inner_stop = outer_stop = inner_start
             else:
@@ -662,8 +653,9 @@ class CompletionContextParser:
                 self.cursor - inner_span.start,
                 is_sub_expression=True,
             )
-            if commands.cursor_context is not None and not any(
-                command.value == commands.cursor_context for command in commands.value
+            if commands.cursor_context is not None and all(
+                command.value != commands.cursor_context
+                for command in commands.value
             ):
                 # the cursor is inside an inner arg
                 cursor_context = commands.cursor_context
@@ -739,14 +731,8 @@ class CompletionContextParser:
 
         is_redir = new_arg.value.is_io_redir or last_arg.value.is_io_redir
 
-        if string_literal is not None or (not in_between and not is_redir):
-            if string_literal is not None:
-                # we're appending to a partial string, e.g. `"a b`
-                arg = string_literal
-            else:
-                # these args are adjacent and didn't match other rules, e.g. `a"b"`
-                arg = CommandArg(joined_raw)
-
+        if string_literal is not None or not in_between and not is_redir:
+            arg = string_literal if string_literal is not None else CommandArg(joined_raw)
             # select which context to preserve
             cursor_context = None
             if relative_cursor is not None:
@@ -757,16 +743,15 @@ class CompletionContextParser:
                 cursor_context = last_arg.cursor_context
             elif new_arg.cursor_context is not None:
                 # the cursor is in the new arg
-                if isinstance(new_arg.cursor_context, int):
-                    # the context is a relative cursor
-                    cursor_context = (
+                cursor_context = (
+                    (
                         len(last_arg.value.raw_value)
                         + len(in_between)
                         + new_arg.cursor_context
                     )
-                else:
-                    cursor_context = new_arg.cursor_context
-
+                    if isinstance(new_arg.cursor_context, int)
+                    else new_arg.cursor_context
+                )
             args[-1] = Spanned(
                 value=arg,
                 span=slice(last_arg.span.start, new_arg.span.stop),
@@ -804,11 +789,13 @@ class CompletionContextParser:
         return self.try_expand_span(obj, new_span)
 
     def try_expand_span(self, obj: Exp, new_span: slice) -> Optional[Exp]:
-        if obj.span.start <= new_span.start and new_span.stop <= obj.span.stop:
-            # the new span doesn't expand the old one
-            if obj.span is not EMPTY_SPAN:
-                # EMPTY_SPAN is a special value for an empty element that isn't yet located anywhere
-                return obj
+        if (
+            obj.span.start <= new_span.start
+            and new_span.stop <= obj.span.stop
+            and obj.span is not EMPTY_SPAN
+        ):
+            # EMPTY_SPAN is a special value for an empty element that isn't yet located anywhere
+            return obj
         if obj.expansion_obj is ExpansionOperation.NEVER_EXPAND:
             return None
         elif isinstance(obj.value, CommandArg):
@@ -938,9 +925,7 @@ class CompletionContextParser:
 
             # this arg is a subcommand or multiple subcommands, e.g. `$(a && b)`
             expanded_obj: Optional[ArgContext] = self.try_expand_span(sub_expr, new_span)  # type: ignore
-            if expanded_obj is None:
-                return None
-            return self.sub_expression_arg(expanded_obj)
+            return None if expanded_obj is None else self.sub_expression_arg(expanded_obj)
         else:
             # this shouldn't happen
             return None
@@ -1023,18 +1008,12 @@ class CompletionContextParser:
                 opening_quote = arg.value.opening_quote
 
         elif self.cursor_in_span(arg.span):
-            if arg.cursor_context is not None and not isinstance(
-                arg.cursor_context, int
-            ):
-                # this arg is already a context (e.g. a sub expression)
-                cursor_context = arg.cursor_context
-            else:
-                if arg.cursor_context is not None:
-                    # this arg provides a relative cursor location
-                    relative_location = arg.cursor_context
-                else:
-                    relative_location = self.cursor - arg.span.start
-
+            if arg.cursor_context is None or isinstance(arg.cursor_context, int):
+                relative_location = (
+                    self.cursor - arg.span.start
+                    if arg.cursor_context is None
+                    else arg.cursor_context
+                )
                 raw_value = arg.value.raw_value
                 if relative_location < len(arg.value.opening_quote):
                     # the cursor is inside the opening quote
@@ -1055,6 +1034,9 @@ class CompletionContextParser:
                     prefix = arg.value.value[:location_in_value]
                     suffix = arg.value.value[location_in_value:]
 
+            else:
+                # this arg is already a context (e.g. a sub expression)
+                cursor_context = arg.cursor_context
         return (
             CommandContext(
                 args=(),
@@ -1070,11 +1052,10 @@ class CompletionContextParser:
 
     def sub_expression_arg(self, sub_expression: ArgContext) -> Spanned[CommandArg]:
         value = self.current_input[sub_expression.span]
-        arg = sub_expression.replace(
+        return sub_expression.replace(
             value=CommandArg(value),
             expansion_obj=sub_expression,
-        )  # preserves the cursor_context and expansion_obj if it they exist
-        return arg
+        )
 
     @staticmethod
     def try_parse_string_literal(raw_arg: str) -> Optional[CommandArg]:

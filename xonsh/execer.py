@@ -212,7 +212,7 @@ class Execer:
         """print some debugging info if asked for."""
         if self.debug_level >= 1:
             msg = "{0}:{1}:{2}{3} - {4}\n" "{0}:{1}:{2}{3} + {5}"
-            mstr = "" if maxcol is None else ":" + str(maxcol)
+            mstr = "" if maxcol is None else f":{str(maxcol)}"
             msg = msg.format(
                 self.filename, last_error_line, last_error_col, mstr, line, sbpline
             )
@@ -293,13 +293,13 @@ class Execer:
                         if greedy
                         else find_next_break(line, mincol=last_error_col, lexer=lexer)
                     )
-                    if not greedy and maxcol in (e.loc.column + 1, e.loc.column):
-                        # go greedy the first time if the syntax error was because
-                        # we hit an end token out of place. This usually indicates
-                        # a subshell or maybe a macro.
-                        if not balanced_parens(line, maxcol=maxcol):
-                            greedy = True
-                            maxcol = None
+                    if (
+                        not greedy
+                        and maxcol in (e.loc.column + 1, e.loc.column)
+                        and not balanced_parens(line, maxcol=maxcol)
+                    ):
+                        greedy = True
+                        maxcol = None
                     sbpline = subproc_toks(
                         line, returnline=True, greedy=greedy, maxcol=maxcol, lexer=lexer
                     )

@@ -50,7 +50,7 @@ class LazyObject:
         return obj
 
     def __getattribute__(self, name):
-        if name == "_lasdo" or name == "_lazy_obj":
+        if name in ["_lasdo", "_lazy_obj"]:
             return super().__getattribute__(name)
         obj = self._lazy_obj()
         return getattr(obj, name)
@@ -60,8 +60,7 @@ class LazyObject:
         return bool(obj)
 
     def __iter__(self):
-        obj = self._lazy_obj()
-        yield from obj
+        yield from self._lazy_obj()
 
     def __getitem__(self, item):
         obj = self._lazy_obj()
@@ -260,14 +259,12 @@ class BackgroundModuleProxy(types.ModuleType):
             return super().__getattribute__(name)
         dct = self.__dct__
         modname = dct["modname"]
-        if dct["loaded"]:
-            mod = sys.modules[modname]
-        else:
+        if not dct["loaded"]:
             delay_types = (BackgroundModuleProxy, type(None))
             while isinstance(sys.modules.get(modname, None), delay_types):
                 time.sleep(0.001)
-            mod = sys.modules[modname]
             dct["loaded"] = True
+        mod = sys.modules[modname]
         # some modules may do construction after import, give them a second
         stall = 0
         while not hasattr(mod, name) and stall < 1000:
@@ -348,8 +345,7 @@ def load_module_in_background(
         xonsh_obj = getattr(builtins, "__xonsh__", None)
         env = os.environ if xonsh_obj is None else getattr(xonsh_obj, "env", os.environ)
     if env.get(debug, None):
-        mod = importlib.import_module(name, package=package)
-        return mod
+        return importlib.import_module(name, package=package)
     proxy = sys.modules[modname] = BackgroundModuleProxy(modname)
     BackgroundModuleLoader(name, package, replacements or {})
     return proxy

@@ -34,10 +34,7 @@ except ImportError:
 
         class _AnnotatedMeta(type):
             def __getitem__(self, item: tp.Tuple[T, tp.Any]) -> T:
-                if tp.TYPE_CHECKING:
-                    return item[0]
-
-                return item[1]
+                return item[0] if tp.TYPE_CHECKING else item[1]
 
         class Annotated(metaclass=_AnnotatedMeta):  # type: ignore
             pass
@@ -118,11 +115,7 @@ class NumpyDoc:
         docs: tp.Dict[str, tp.List[str]] = defaultdict(list)
         name = None
 
-        while lines:
-            # check new section by checking next line
-            if len(lines) > 1 and (set(lines[1].strip()) == {"-"}):
-                break
-
+        while lines and (len(lines) <= 1 or set(lines[1].strip()) != {"-"}):
             lin = lines.pop(0)
 
             if not lin:
@@ -240,7 +233,7 @@ def add_args(
             and (not isinstance(action.default, bool))
             and ("%(default)s" not in action.help)
         ):
-            action.help += os.linesep + " (default: '%(default)s')"
+            action.help += f"{os.linesep} (default: '%(default)s')"
         if action.type and "%(type)s" not in action.help:
             action.help += " (type: %(type)s)"
 
@@ -254,9 +247,8 @@ def make_parser(
     doc = NumpyDoc(func)
     if "description" not in kwargs:
         kwargs["description"] = doc.description
-    if "epilog" not in kwargs:
-        if doc.epilog:
-            kwargs["epilog"] = doc.epilog
+    if "epilog" not in kwargs and doc.epilog:
+        kwargs["epilog"] = doc.epilog
     parser = ArgParser(**kwargs)
     if empty_help:
         parser.set_defaults(
@@ -419,7 +411,7 @@ def dispatch(parser: ap.ArgumentParser, args=None, lenient=False, **ns):
     else:
         parsed = parser.parse_args(args)
     ns["_parsed"] = parsed
-    ns.update(vars(parsed))
+    ns |= vars(parsed)
 
     func = ns[_FUNC_NAME]
     return _dispatch_func(func, ns)
@@ -481,7 +473,7 @@ class ArgparseCompleter:
     def _complete(self, act: ap.Action, **kwargs):
         if hasattr(act, "completer") and callable(act.completer):  # type: ignore
             # call the completer function
-            kwargs.update(self.kwargs)
+            kwargs |= self.kwargs
             yield from act.completer(xsh=XSH, action=act, completer=self, **kwargs)  # type: ignore
 
         if (
@@ -508,9 +500,7 @@ class ArgparseCompleter:
         # options will come before/after positionals
         options = {act: None for act in self.parser._get_optional_actions()}
 
-        # remove options that are already filled
-        opt_completions = self._complete_options(options)
-        if opt_completions:
+        if opt_completions := self._complete_options(options):
             yield from opt_completions
             return
 
@@ -522,19 +512,17 @@ class ArgparseCompleter:
             # close after a valid positional arg completion
             break
 
-        opt_completions = self._complete_options(options)
-        if opt_completions:
+        if opt_completions := self._complete_options(options):
             yield from opt_completions
             return
 
         # complete remaining options only if requested or enabled
         show_opts = XSH.env.get("ALIAS_COMPLETIONS_OPTIONS_BY_DEFAULT", False)
-        if not show_opts:
-            if not (
-                self.command.prefix
-                and self.command.prefix[0] in self.parser.prefix_chars
-            ):
-                return
+        if not show_opts and not (
+            self.command.prefix
+            and self.command.prefix[0] in self.parser.prefix_chars
+        ):
+            return
 
         # in the end after positionals show remaining unfilled options
         for act in options:

@@ -43,7 +43,7 @@ def test_shell_with_json_history(xession, xonsh_execer, tmpdir_factory):
 
     Shell(xonsh_execer, shell_type="none")
 
-    assert len([i for i in xession.history.all_items()]) == 2
+    assert len(list(xession.history.all_items())) == 2
 
 
 def test_shell_with_sqlite_history(xession, xonsh_execer, tmpdir_factory):
@@ -82,7 +82,7 @@ def test_shell_with_sqlite_history(xession, xonsh_execer, tmpdir_factory):
 
     Shell(xonsh_execer, shell_type="none")
 
-    assert len([i for i in xession.history.all_items()]) == 2
+    assert len(list(xession.history.all_items())) == 2
 
 
 def test_shell_with_dummy_history_in_not_interactive(xession, xonsh_execer):

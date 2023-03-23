@@ -14,6 +14,7 @@ Original file credits:
                   'Michael Foord')
 """
 
+
 import builtins
 import codecs
 import collections
@@ -126,11 +127,7 @@ else:
     ADDSPACE_TOKS = (NAME, NUMBER)  # type:ignore
 del token  # must clean up token
 
-if HAS_WALRUS:
-    AUGASSIGN_OPS = r"[+\-*/%&@|^=<>:]=?"
-else:
-    AUGASSIGN_OPS = r"[+\-*/%&@|^=<>]=?"
-
+AUGASSIGN_OPS = r"[+\-*/%&@|^=<>:]=?" if HAS_WALRUS else r"[+\-*/%&@|^=<>]=?"
 COMMENT = N_TOKENS
 tok_name[COMMENT] = "COMMENT"
 NL = N_TOKENS + 1
@@ -259,11 +256,11 @@ def group(*choices):
 
 
 def tokany(*choices):
-    return group(*choices) + "*"
+    return f"{group(*choices)}*"
 
 
 def maybe(*choices):
-    return group(*choices) + "?"
+    return f"{group(*choices)}?"
 
 
 # Note: we use unicode matching for names ("\w") but ascii matching for
@@ -282,9 +279,9 @@ Exponent = r"[eE][-+]?[0-9](?:_?[0-9])*"
 Pointfloat = group(
     r"[0-9](?:_?[0-9])*\.(?:[0-9](?:_?[0-9])*)?", r"\.[0-9](?:_?[0-9])*"
 ) + maybe(Exponent)
-Expfloat = r"[0-9](?:_?[0-9])*" + Exponent
+Expfloat = f"[0-9](?:_?[0-9])*{Exponent}"
 Floatnumber = group(Pointfloat, Expfloat)
-Imagnumber = group(r"[0-9](?:_?[0-9])*[jJ]", Floatnumber + r"[jJ]")
+Imagnumber = group(r"[0-9](?:_?[0-9])*[jJ]", f"{Floatnumber}[jJ]")
 Number = group(Imagnumber, Floatnumber, Intnumber)
 
 StringPrefix = r"(?:[bB][rR]?|[p][fFrR]?|[rR][bBpfF]?|[uU]|[fF][rR]?[p]?)?"
@@ -297,7 +294,7 @@ Double = r'[^"\\]*(?:\\.[^"\\]*)*"'
 Single3 = r"[^'\\]*(?:(?:\\.|'(?!''))[^'\\]*)*'''"
 # Tail end of """ string.
 Double3 = r'[^"\\]*(?:(?:\\.|"(?!""))[^"\\]*)*"""'
-Triple = group(StringPrefix + "'''", StringPrefix + '"""')
+Triple = group(f"{StringPrefix}'''", f'{StringPrefix}"""')
 # Single-line ' or " string.
 String = group(
     StringPrefix + r"'[^\n'\\]*(?:\\.[^\n'\\]*)*'",
@@ -465,151 +462,152 @@ endpats = {
     "F": None,
 }
 
-triple_quoted = {}
-for t in (
-    "'''",
-    '"""',
-    "r'''",
-    'r"""',
-    "R'''",
-    'R"""',
-    "b'''",
-    'b"""',
-    "B'''",
-    'B"""',
-    "f'''",
-    'f"""',
-    "F'''",
-    'F"""',
-    "br'''",
-    'br"""',
-    "Br'''",
-    'Br"""',
-    "bR'''",
-    'bR"""',
-    "BR'''",
-    'BR"""',
-    "rb'''",
-    'rb"""',
-    "rB'''",
-    'rB"""',
-    "Rb'''",
-    'Rb"""',
-    "RB'''",
-    'RB"""',
-    "fr'''",
-    'fr"""',
-    "Fr'''",
-    'Fr"""',
-    "fR'''",
-    'fR"""',
-    "FR'''",
-    'FR"""',
-    "rf'''",
-    'rf"""',
-    "rF'''",
-    'rF"""',
-    "Rf'''",
-    'Rf"""',
-    "RF'''",
-    'RF"""',
-    "u'''",
-    'u"""',
-    "U'''",
-    'U"""',
-    "p'''",
-    'p""""',
-    "pr'''",
-    'pr""""',
-    "pR'''",
-    'pR""""',
-    "rp'''",
-    'rp""""',
-    "Rp'''",
-    'Rp""""',
-    "pf'''",
-    'pf""""',
-    "pF'''",
-    'pF""""',
-    "fp'''",
-    'fp""""',
-    "Fp'''",
-    'Fp""""',
-):
-    triple_quoted[t] = t
-single_quoted = {}
-for t in (
-    "'",
-    '"',
-    "r'",
-    'r"',
-    "R'",
-    'R"',
-    "b'",
-    'b"',
-    "B'",
-    'B"',
-    "f'",
-    'f"',
-    "F'",
-    'F"',
-    "br'",
-    'br"',
-    "Br'",
-    'Br"',
-    "bR'",
-    'bR"',
-    "BR'",
-    'BR"',
-    "rb'",
-    'rb"',
-    "rB'",
-    'rB"',
-    "Rb'",
-    'Rb"',
-    "RB'",
-    'RB"',
-    "fr'",
-    'fr"',
-    "Fr'",
-    'Fr"',
-    "fR'",
-    'fR"',
-    "FR'",
-    'FR"',
-    "rf'",
-    'rf"',
-    "rF'",
-    'rF"',
-    "Rf'",
-    'Rf"',
-    "RF'",
-    'RF"',
-    "u'",
-    'u"',
-    "U'",
-    'U"',
-    "p'",
-    'p"',
-    "pr'",
-    'pr"',
-    "pR'",
-    'pR"',
-    "rp'",
-    'rp"',
-    "Rp'",
-    'Rp"',
-    "pf'",
-    'pf"',
-    "pF'",
-    'pF"',
-    "fp'",
-    'fp"',
-    "Fp'",
-    'Fp"',
-):
-    single_quoted[t] = t
-
+triple_quoted = {
+    t: t
+    for t in (
+        "'''",
+        '"""',
+        "r'''",
+        'r"""',
+        "R'''",
+        'R"""',
+        "b'''",
+        'b"""',
+        "B'''",
+        'B"""',
+        "f'''",
+        'f"""',
+        "F'''",
+        'F"""',
+        "br'''",
+        'br"""',
+        "Br'''",
+        'Br"""',
+        "bR'''",
+        'bR"""',
+        "BR'''",
+        'BR"""',
+        "rb'''",
+        'rb"""',
+        "rB'''",
+        'rB"""',
+        "Rb'''",
+        'Rb"""',
+        "RB'''",
+        'RB"""',
+        "fr'''",
+        'fr"""',
+        "Fr'''",
+        'Fr"""',
+        "fR'''",
+        'fR"""',
+        "FR'''",
+        'FR"""',
+        "rf'''",
+        'rf"""',
+        "rF'''",
+        'rF"""',
+        "Rf'''",
+        'Rf"""',
+        "RF'''",
+        'RF"""',
+        "u'''",
+        'u"""',
+        "U'''",
+        'U"""',
+        "p'''",
+        'p""""',
+        "pr'''",
+        'pr""""',
+        "pR'''",
+        'pR""""',
+        "rp'''",
+        'rp""""',
+        "Rp'''",
+        'Rp""""',
+        "pf'''",
+        'pf""""',
+        "pF'''",
+        'pF""""',
+        "fp'''",
+        'fp""""',
+        "Fp'''",
+        'Fp""""',
+    )
+}
+single_quoted = {
+    t: t
+    for t in (
+        "'",
+        '"',
+        "r'",
+        'r"',
+        "R'",
+        'R"',
+        "b'",
+        'b"',
+        "B'",
+        'B"',
+        "f'",
+        'f"',
+        "F'",
+        'F"',
+        "br'",
+        'br"',
+        "Br'",
+        'Br"',
+        "bR'",
+        'bR"',
+        "BR'",
+        'BR"',
+        "rb'",
+        'rb"',
+        "rB'",
+        'rB"',
+        "Rb'",
+        'Rb"',
+        "RB'",
+        'RB"',
+        "fr'",
+        'fr"',
+        "Fr'",
+        'Fr"',
+        "fR'",
+        'fR"',
+        "FR'",
+        'FR"',
+        "rf'",
+        'rf"',
+        "rF'",
+        'rF"',
+        "Rf'",
+        'Rf"',
+        "RF'",
+        'RF"',
+        "u'",
+        'u"',
+        "U'",
+        'U"',
+        "p'",
+        'p"',
+        "pr'",
+        'pr"',
+        "pR'",
+        'pR"',
+        "rp'",
+        'rp"',
+        "Rp'",
+        'Rp"',
+        "pf'",
+        'pf"',
+        "pF'",
+        'pF"',
+        "fp'",
+        'fp"',
+        "Fp'",
+        'Fp"',
+    )
+}
 tabsize = 8
 
 
@@ -632,16 +630,12 @@ class Untokenizer:
         row, col = start
         if row < self.prev_row or row == self.prev_row and col < self.prev_col:
             raise ValueError(
-                "start ({},{}) precedes previous end ({},{})".format(
-                    row, col, self.prev_row, self.prev_col
-                )
+                f"start ({row},{col}) precedes previous end ({self.prev_row},{self.prev_col})"
             )
-        row_offset = row - self.prev_row
-        if row_offset:
+        if row_offset := row - self.prev_row:
             self.tokens.append("\\\n" * row_offset)
             self.prev_col = 0
-        col_offset = col - self.prev_col
-        if col_offset:
+        if col_offset := col - self.prev_col:
             self.tokens.append(" " * col_offset)
 
     def untokenize(self, iterable):
@@ -699,7 +693,7 @@ class Untokenizer:
             # Insert a space between two consecutive strings
             if toknum == STRING:
                 if prevstring:
-                    tokval = " " + tokval
+                    tokval = f" {tokval}"
                 prevstring = True
             else:
                 prevstring = False
@@ -810,7 +804,7 @@ def detect_encoding(readline):
         except LookupError:
             # This behaviour mimics the Python interpreter
             if filename is None:
-                msg = "unknown encoding: " + encoding
+                msg = f"unknown encoding: {encoding}"
             else:
                 msg = f"unknown encoding for {filename!r}: {encoding}"
             raise SyntaxError(msg)
@@ -845,10 +839,7 @@ def detect_encoding(readline):
         return default, [first]
 
     encoding = find_cookie(second)
-    if encoding:
-        return encoding, [first, second]
-
-    return default, [first, second]
+    return (encoding, [first, second]) if encoding else (default, [first, second])
 
 
 def tokopen(filename):
@@ -898,16 +889,14 @@ def _tokenize(readline, encoding, tolerant=False):
 
         if contstr:  # continued string
             if not line:
-                if tolerant:
-                    # return the partial string
-                    yield TokenInfo(
-                        ERRORTOKEN, contstr, strstart, (lnum, end), contline + line
-                    )
-                    break
-                else:
+                if not tolerant:
                     raise TokenError("EOF in multi-line string", strstart)
-            endmatch = endprog.match(line)
-            if endmatch:
+                # return the partial string
+                yield TokenInfo(
+                    ERRORTOKEN, contstr, strstart, (lnum, end), contline + line
+                )
+                break
+            if endmatch := endprog.match(line):
                 pos = end = endmatch.end(0)
                 yield TokenInfo(
                     STRING, contstr + line[:end], strstart, (lnum, end), contline + line
@@ -1001,8 +990,7 @@ def _tokenize(readline, encoding, tolerant=False):
             continued = 0
 
         while pos < max:
-            pseudomatch = _compile(PseudoToken).match(line, pos)
-            if pseudomatch:  # scan for tokens
+            if pseudomatch := _compile(PseudoToken).match(line, pos):
                 start, end = pseudomatch.span(1)
                 spos, epos, pos = (lnum, start), (lnum, end), end
                 if start == end:
@@ -1032,13 +1020,11 @@ def _tokenize(readline, encoding, tolerant=False):
                         yield stashed
                         stashed = None
                     yield TokenInfo(COMMENT, token, spos, epos, line)
-                # Xonsh-specific Regex Globbing
                 elif re.match(SearchPath, token):
                     yield TokenInfo(SEARCHPATH, token, spos, epos, line)
                 elif token in triple_quoted:
                     endprog = _compile(endpats[token])
-                    endmatch = endprog.match(line, pos)
-                    if endmatch:  # all on one line
+                    if endmatch := endprog.match(line, pos):
                         pos = endmatch.end(0)
                         token = line[start:pos]
                         yield TokenInfo(STRING, token, spos, (lnum, pos), line)
@@ -1065,16 +1051,15 @@ def _tokenize(readline, encoding, tolerant=False):
                 elif token.startswith("$") and token[1:].isidentifier():
                     yield TokenInfo(DOLLARNAME, token, spos, epos, line)
                 elif initial.isidentifier():  # ordinary name
-                    if token in ("async", "await"):
-                        if async_def:
-                            yield TokenInfo(
-                                ASYNC if token == "async" else AWAIT,
-                                token,
-                                spos,
-                                epos,
-                                line,
-                            )
-                            continue
+                    if token in ("async", "await") and async_def:
+                        yield TokenInfo(
+                            ASYNC if token == "async" else AWAIT,
+                            token,
+                            spos,
+                            epos,
+                            line,
+                        )
+                        continue
 
                     tok = TokenInfo(NAME, token, spos, epos, line)
                     if token == "async" and not stashed:
@@ -1107,19 +1092,21 @@ def _tokenize(readline, encoding, tolerant=False):
                         stashed = None
 
                     yield tok
-                elif token == "\\\n" or token == "\\\r\n":  # continued stmt
+                elif token in ["\\\n", "\\\r\n"]:  # continued stmt
                     continued = 1
                     yield TokenInfo(ERRORTOKEN, token, spos, epos, line)
                 elif initial == "\\":  # continued stmt
                     # for cases like C:\\path\\to\\file
                     continued = 1
                 else:
-                    if initial in "([{":
+                    if (
+                        initial in "([{"
+                        or initial not in ")]}"
+                        and token in additional_parenlevs
+                    ):
                         parenlev += 1
                     elif initial in ")]}":
                         parenlev -= 1
-                    elif token in additional_parenlevs:
-                        parenlev += 1
                     if stashed:
                         yield stashed
                         stashed = None
@@ -1189,7 +1176,7 @@ def tokenize_main():
         elif filename:
             perror(f"{filename}: error: {message}")
         else:
-            perror("error: %s" % message)
+            perror(f"error: {message}")
         sys.exit(1)
 
     # Parse the arguments and options
@@ -1239,5 +1226,5 @@ def tokenize_main():
     except KeyboardInterrupt:
         print("interrupted\n")
     except Exception as err:
-        perror("unexpected error: %s" % err)
+        perror(f"unexpected error: {err}")
         raise

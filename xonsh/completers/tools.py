@@ -34,8 +34,7 @@ def get_filter_function():
     Return an appropriate filtering function for completions, given the valid
     of $CASE_SENSITIVE_COMPLETIONS
     """
-    csc = XSH.env.get("CASE_SENSITIVE_COMPLETIONS")
-    if csc:
+    if csc := XSH.env.get("CASE_SENSITIVE_COMPLETIONS"):
         return _filter_normal
     else:
         return _filter_ignorecase
@@ -117,11 +116,13 @@ class RichCompletion(str):
 
     def replace(self, **kwargs):
         """Create a new RichCompletion with replaced attributes"""
-        default_kwargs = dict(
-            value=self.value,
-            **self.__dict__,
+        default_kwargs = (
+            dict(
+                value=self.value,
+                **self.__dict__,
+            )
+            | kwargs
         )
-        default_kwargs.update(kwargs)
         return RichCompletion(**default_kwargs)
 
 
@@ -164,9 +165,7 @@ def contextual_command_completer(func: tp.Callable[[CommandContext], CompleterRe
     @contextual_completer
     @wraps(func)
     def _completer(context: CompletionContext) -> CompleterResult:
-        if context.command is not None:
-            return func(context.command)
-        return None
+        return func(context.command) if context.command is not None else None
 
     return _completer
 
@@ -239,7 +238,7 @@ def sub_proc_get_output(*args, **env_vars: str) -> "tuple[bytes, bool]":
     env = {}
 
     # env.detype is mutable, so update the newly created variable
-    env.update(XSH.env.detype())
+    env |= XSH.env.detype()
 
     env.update(env_vars)  # prefer passed env variables
 
@@ -268,26 +267,19 @@ def complete_from_sub_proc(*args: str, sep=None, filter_prefix=None, **env_vars:
 
     if stdout:
         output = stdout.decode().strip()
-        if callable(sep):
-            lines = sep(output)
-        else:
-            lines = output.split(sep)
-
+        lines = sep(output) if callable(sep) else output.split(sep)
         # if there is a single completion candidate then maybe it is over
         append_space = len(lines) == 1
         for line in lines:
             if filter_prefix and (not filter_func(line, filter_prefix)):
                 continue
-            comp = completion_from_cmd_output(line, append_space)
-            yield comp
+            yield completion_from_cmd_output(line, append_space)
 
 
 def comp_based_completer(ctx: CommandContext, start_index=0, **env: str):
     """Helper function to complete commands such as ``pip``,``django-admin``,... that use bash's ``complete``"""
-    prefix = ctx.prefix
-
     args = [arg.value for arg in ctx.args]
-    if prefix:
+    if prefix := ctx.prefix:
         args.append(prefix)
 
     yield from complete_from_sub_proc(

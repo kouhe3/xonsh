@@ -16,8 +16,8 @@ EQUAL_S = "equal"
 def bold_str_diff(a, b, sm=None):
     if sm is None:
         sm = difflib.SequenceMatcher()
-    aline = COLORS.RED + "- "
-    bline = COLORS.GREEN + "+ "
+    aline = f"{COLORS.RED}- "
+    bline = f"{COLORS.GREEN}+ "
     sm.set_seqs(a, b)
     for tag, i1, i2, j1, j2 in sm.get_opcodes():
         if tag == REPLACE_S:
@@ -70,7 +70,7 @@ def highlighted_ndiff(a, b):
                 s += greenline(bline)
         elif tag == EQUAL_S:
             for aline in a[i1:i2]:
-                s += "  " + aline + "\n"
+                s += f"  {aline}" + "\n"
         else:
             raise RuntimeError("tag not understood")
     return s
@@ -122,14 +122,13 @@ class HistoryDiffer:
     def header(self):
         """Computes a header string difference."""
         s = "{red}--- {aline}{reset}\n" "{green}+++ {bline}{reset}"
-        s = s.format(
+        return s.format(
             aline=self._header_line(self.a),
             bline=self._header_line(self.b),
             red=COLORS.RED,
             green=COLORS.GREEN,
             reset=COLORS.RESET,
         )
-        return s
 
     def _env_both_diff(self, in_both, aenv, benv):
         sm = self.sm
@@ -177,8 +176,7 @@ class HistoryDiffer:
             in_b = self._env_in_one_diff(
                 bkeys, akeys, COLORS.GREEN, self.b["sessionid"], benv
             )
-        s = "Environment\n-----------\n" + in_a + keydiff + in_b
-        return s
+        return "Environment\n-----------\n" + in_a + keydiff + in_b
 
     def _cmd_in_one_diff(self, inp, i, xlj, xid, color):
         s = "cmd #{i} only in {color}{xid}{reset}:\n"
@@ -214,8 +212,6 @@ class HistoryDiffer:
         elif aout != bout:
             s += "Outputs differ\n"
             s += highlighted_ndiff(aout.splitlines(), bout.splitlines())
-        else:
-            pass
         artn = self.a["cmds"][i]["rtn"]
         brtn = self.b["cmds"][j]["rtn"]
         if artn != brtn:
@@ -297,9 +293,7 @@ class HistoryDiffer:
                         s += odiff + "\n"
             else:
                 raise RuntimeError("tag not understood")
-        if len(s) == 0:
-            return s
-        return "Commands\n--------\n" + s
+        return s if len(s) == 0 else "Commands\n--------\n" + s
 
     def format(self):
         """Formats the difference between the two history files."""

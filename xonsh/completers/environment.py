@@ -32,7 +32,7 @@ def complete_environment_vars(context: CompletionContext):
 
     return (
         RichCompletion(
-            "$" + k,
+            f"${k}",
             display=f"${k} [{type(v).__name__}]",
             description=env.get_docs(k).doc,
         )

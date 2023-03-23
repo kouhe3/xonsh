@@ -152,9 +152,9 @@ def complete_python(context: CompletionContext) -> CompleterResult:
     rtn = _complete_python(prefix, context.python)
     if not rtn:
         prefix = (
-            re.split(r"\(|=|{|\[|,", prefix)[-1]
-            if not prefix.startswith(",")
-            else prefix
+            prefix
+            if prefix.startswith(",")
+            else re.split(r"\(|=|{|\[|,", prefix)[-1]
         )
         rtn = _complete_python(prefix, context.python)
     return rtn, len(prefix)
@@ -245,9 +245,9 @@ def attr_complete(prefix, ctx, filter_func):
         a = getattr(val, opt)
         if XSH.env["COMPLETIONS_BRACKETS"]:
             if callable(a):
-                rpl = opt + "("
+                rpl = f"{opt}("
             elif isinstance(a, (cabc.Sequence, cabc.Mapping)):
-                rpl = opt + "["
+                rpl = f"{opt}["
             else:
                 rpl = opt
         else:
@@ -275,5 +275,4 @@ def python_signature_complete(prefix, line, end, ctx, filter_func):
         sig = inspect.signature(val)
     except (ValueError, TypeError):
         return set()
-    args = {p + "=" for p in sig.parameters if filter_func(p, prefix)}
-    return args
+    return {f"{p}=" for p in sig.parameters if filter_func(p, prefix)}

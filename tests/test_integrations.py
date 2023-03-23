@@ -49,10 +49,7 @@ def run_xonsh(
     path=None,
 ):
     env = dict(os.environ)
-    if path is None:
-        env["PATH"] = PATH
-    else:
-        env["PATH"] = path
+    env["PATH"] = PATH if path is None else path
     env["XONSH_DEBUG"] = "0"  # was "1"
     env["XONSH_SHOW_TRACEBACK"] = "1"
     env["RAISE_SUBPROC_ERROR"] = "0"

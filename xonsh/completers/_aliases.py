@@ -28,8 +28,8 @@ def complete_completer_pos_choices(xsh, **_):
     """Compute possible positions for the new completer"""
     yield from {"start", "end"}
     for k in xsh.completers.keys():
-        yield ">" + k
-        yield "<" + k
+        yield f">{k}"
+        yield f"<{k}"
 
 
 def _register_completer(
@@ -75,22 +75,21 @@ def _register_completer(
     xsh = XSH
     if name in xsh.completers:
         err = f"The name {name} is already a registered completer function."
+    elif func_name in xsh.ctx:
+        func = xsh.ctx[func_name]
+        if not callable(func):
+            err = f"{func_name} is not callable"
     else:
-        if func_name in xsh.ctx:
-            func = xsh.ctx[func_name]
-            if not callable(func):
-                err = f"{func_name} is not callable"
+        for frame_info in _stack:
+            frame = frame_info[0]
+            if func_name in frame.f_locals:
+                func = frame.f_locals[func_name]
+                break
+            elif func_name in frame.f_globals:
+                func = frame.f_globals[func_name]
+                break
         else:
-            for frame_info in _stack:
-                frame = frame_info[0]
-                if func_name in frame.f_locals:
-                    func = frame.f_locals[func_name]
-                    break
-                elif func_name in frame.f_globals:
-                    func = frame.f_globals[func_name]
-                    break
-            else:
-                err = "No such function: %s" % func_name
+            err = f"No such function: {func_name}"
     if err is None:
         _add_one_completer(name, func, pos)
     else:

@@ -347,7 +347,7 @@ class LsColors(cabc.MutableMapping):
     def __init__(self, ini_dict: dict = None):
         self._style = self._style_name = None
         self._detyped = None
-        self._d = dict()
+        self._d = {}
         self._targets = set()
         if ini_dict:
             for key, value in ini_dict.items():
@@ -442,7 +442,7 @@ class LsColors(cabc.MutableMapping):
         """Creates a new instance of the LsColors class from a colon-separated
         string of dircolor-valid keys to ANSI color escape sequences.
         """
-        ini_dict = dict()
+        ini_dict = {}
         # string inputs always use default codes, so translating into
         # xonsh names should be done from defaults
         reversed_default = ansi_reverse_style(style="default")
@@ -459,7 +459,7 @@ class LsColors(cabc.MutableMapping):
                         esc, "default", reversed_style=reversed_default
                     )
                 except Exception as e:
-                    print("xonsh:warning:" + str(e), file=sys.stderr)
+                    print(f"xonsh:warning:{str(e)}", file=sys.stderr)
                     ini_dict[key] = ("RESET",)
         return cls(ini_dict)
 
@@ -473,10 +473,7 @@ class LsColors(cabc.MutableMapping):
         if filename is not None:
             cmd.append(filename)
         # get env
-        if XSH.env:
-            denv = XSH.env.detype()
-        else:
-            denv = None
+        denv = XSH.env.detype() if XSH.env else None
         # run dircolors
         try:
             out = subprocess.check_output(
@@ -605,18 +602,14 @@ def xonsh_sys_config_dir(env):
     On Linux & Mac OSX: ``'/etc/xonsh'``
     On Windows: ``'%ALLUSERSPROFILE%\\\\xonsh'``
     """
-    if ON_WINDOWS:
-        etc_path = os_environ["ALLUSERSPROFILE"]
-    else:
-        etc_path = "/etc"
+    etc_path = os_environ["ALLUSERSPROFILE"] if ON_WINDOWS else "/etc"
     return os.path.join(etc_path, "xonsh")
 
 
 def xonshconfig(env):
     """Ensures and returns the $XONSHCONFIG"""
     xcd = env.get("XONSH_CONFIG_DIR")
-    xc = os.path.join(xcd, "config.json")
-    return xc
+    return os.path.join(xcd, "config.json")
 
 
 @default_value
@@ -763,9 +756,7 @@ class Var(tp.NamedTuple):
 
         if type_str in ENSURERS and "validate" not in kwargs:
             validator, convertor, detyper = ENSURERS[type_str]
-            kwargs.update(
-                {"validate": validator, "convert": convertor, "detype": detyper}
-            )
+            kwargs |= {"validate": validator, "convert": convertor, "detype": detyper}
 
         if doc_default == DefaultNotGiven and is_callable_default(default):
             doc_default = inspect.getdoc(default) or DefaultNotGiven
@@ -832,15 +823,11 @@ class Xettings:
 
     @classmethod
     def get_group_title(cls) -> str:
-        doc = cls.get_doc()
-        if doc:
-            return doc.splitlines()[0]
-        return cls.__name__
+        return doc.splitlines()[0] if (doc := cls.get_doc()) else cls.__name__
 
     @classmethod
     def get_group_description(cls) -> str:
-        doc = cls.get_doc()
-        if doc:
+        if doc := cls.get_doc():
             lines = doc.splitlines()
             if len(lines) > 1:
                 return "\n".join(lines[1:])
@@ -1932,9 +1919,9 @@ class Env(cabc.MutableMapping):
         # sentinel value for non existing envvars
         self._no_value = object()
         self._orig_env = None
-        self._vars = {k: v for k, v in DEFAULT_VARS.items()}
+        self._vars = dict(DEFAULT_VARS.items())
 
-        if len(args) == 0 and len(kwargs) == 0:
+        if not args and not kwargs:
             args = (os_environ,)
         for key, val in dict(*args, **kwargs).items():
             self[key] = val
@@ -2187,9 +2174,7 @@ class Env(cabc.MutableMapping):
         if self.get("UPDATE_OS_ENVIRON"):
             if self._orig_env is None:
                 self.replace_env()
-            elif detyper is None:
-                pass
-            else:
+            elif detyper is not None:
                 deval = detyper(val)
                 if deval is not None:
                     os_environ[key] = deval
@@ -2267,7 +2252,7 @@ class Env(cabc.MutableMapping):
 
     def _repr_pretty_(self, p, cycle):
         name = f"{self.__class__.__module__}.{self.__class__.__name__}"
-        with p.group(1, name + "(", ")"):
+        with p.group(1, f"{name}(", ")"):
             if cycle:
                 p.text("...")
             elif len(self):
@@ -2324,14 +2309,15 @@ class Env(cabc.MutableMapping):
         ):
             validate, convert, detype = ENSURERS[type]
 
-        if default is not None:
-            if is_callable_default(default) or validate(default):
-                pass
-            else:
-                raise ValueError(
-                    f"Default value for {name} does not match type specified "
-                    "by validate and is not a callable default."
-                )
+        if (
+            default is not None
+            and not is_callable_default(default)
+            and not validate(default)
+        ):
+            raise ValueError(
+                f"Default value for {name} does not match type specified "
+                "by validate and is not a callable default."
+            )
 
         self._vars[name] = Var(
             validate,
@@ -2356,9 +2342,7 @@ class Env(cabc.MutableMapping):
         self._vars.pop(name)
 
     def is_configurable(self, name):
-        if name not in self._vars:
-            return False
-        return self._vars[name].is_configurable
+        return False if name not in self._vars else self._vars[name].is_configurable
 
 
 class InternalEnvironDict(ChainMap):
@@ -2422,10 +2406,8 @@ class InternalEnvironDict(ChainMap):
         self._local[key] = value
 
     def del_locally(self, key):
-        try:
+        with contextlib.suppress(KeyError):
             del self._local[key]
-        except KeyError:
-            pass
 
     def get_local_overrides(self):
         return self._local.copy()
@@ -2479,19 +2461,17 @@ def xonshrc_context(
     if rcfiles is not None:
         for rcfile in rcfiles:
             if os.path.isfile(rcfile):
-                status = xonsh_script_run_control(
+                if status := xonsh_script_run_control(
                     rcfile, ctx, env, execer=execer, login=login
-                )
-                if status:
+                ):
                     loaded.append(rcfile)
 
     if rcdirs is not None:
         for rcdir in rcdirs:
             for rcfile in sorted(dict(scan_dir_for_source_files(rcdir))):
-                status = xonsh_script_run_control(
+                if status := xonsh_script_run_control(
                     rcfile, ctx, env, execer=execer, login=login
-                )
-                if status:
+                ):
                     loaded.append(rcfile)
     if env["THREAD_SUBPROCS"] is None:
         env["THREAD_SUBPROCS"] = orig_thread
@@ -2565,16 +2545,14 @@ def default_env(env=None):
         "PROMPT_FIELDS": DEFAULT_VARS["PROMPT_FIELDS"].default(env),
         "XONSH_VERSION": XONSH_VERSION,
     }
-    ctx.update(os_environ)
+    ctx |= os_environ
     ctx["PWD"] = _get_cwd() or ""
     # These can cause problems for programs (#2543)
     ctx.pop("LINES", None)
     ctx.pop("COLUMNS", None)
     # other shells' PROMPT definitions generally don't work in XONSH:
-    try:
+    with contextlib.suppress(KeyError):
         del ctx["PROMPT"]
-    except KeyError:
-        pass
     # increment $SHLVL
     old_shlvl = to_shlvl(ctx.get("SHLVL", None))
     ctx["SHLVL"] = adjust_shlvl(old_shlvl, 1)
@@ -2590,6 +2568,6 @@ def make_args_env(args=None):
     """
     if args is None:
         args = sys.argv
-    env = {"ARG" + str(i): arg for i, arg in enumerate(args)}
+    env = {f"ARG{str(i)}": arg for i, arg in enumerate(args)}
     env["ARGS"] = list(args)  # make a copy so we don't interfere with original variable
     return env

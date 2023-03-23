@@ -74,8 +74,6 @@ def test_prompt_toolkit_version_checks(
     if warn_snip:
         assert warn_snip in mocked_warn
 
-    pass
-
 
 @pytest.mark.parametrize(
     "prompt_tokens, ansi_string_parts",
@@ -145,4 +143,4 @@ def test_ptk_default_append_history(cmd, exp_append_history, ptk_shell, monkeypa
     if exp_append_history:
         assert len(append_history_calls) == 1
     else:
-        assert len(append_history_calls) == 0
+        assert not append_history_calls

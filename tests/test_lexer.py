@@ -46,14 +46,15 @@ def assert_token_equal(x, y):
 def assert_tokens_equal(x, y):
     """Asserts that two token sequences are equal."""
     if len(x) != len(y):
-        msg = "The tokens sequences have different lengths: {0!r} != {1!r}\n"
-        msg += "# x\n{2}\n\n# y\n{3}"
+        msg = (
+            "The tokens sequences have different lengths: {0!r} != {1!r}\n"
+            + "# x\n{2}\n\n# y\n{3}"
+        )
         pytest.fail(msg.format(len(x), len(y), pformat(x), pformat(y)))
-    diffs = [(a, b) for a, b in zip(x, y) if not tokens_equal(a, b)]
-    if len(diffs) > 0:
+    if diffs := [(a, b) for a, b in zip(x, y) if not tokens_equal(a, b)]:
         msg = ["The token sequences differ: "]
         for a, b in diffs:
-            msg += ["", "- " + repr(a), "+ " + repr(b)]
+            msg += ["", f"- {repr(a)}", f"+ {repr(b)}"]
         msg = "\n".join(msg)
         pytest.fail(msg)
     return True
@@ -68,8 +69,10 @@ def lex_input(inp: str):
 def check_token(inp, exp):
     obs = lex_input(inp)
     if len(obs) != 1:
-        msg = "The observed sequence does not have length-1: {0!r} != 1\n"
-        msg += "# obs\n{1}"
+        msg = (
+            "The observed sequence does not have length-1: {0!r} != 1\n"
+            + "# obs\n{1}"
+        )
         pytest.fail(msg.format(len(obs), pformat(obs)))
     return assert_token_equal(exp, obs[0])
 
@@ -474,5 +477,5 @@ def test_lexer_split(s, exp):
 def test_tolerant_lexer(s):
     lexer = Lexer(tolerant=True)
     lexer.input(s)
-    error_tokens = list(tok for tok in lexer if tok.type == "ERRORTOKEN")
+    error_tokens = [tok for tok in lexer if tok.type == "ERRORTOKEN"]
     assert all(tok.value in s for tok in error_tokens)  # no error messages

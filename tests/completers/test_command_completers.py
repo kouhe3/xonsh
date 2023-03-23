@@ -18,11 +18,7 @@ def xs_orig_commands_cache(xession):
 
 
 def test_complete_command(completion_context_parse):
-    if ON_WINDOWS:
-        command = "dir.exe"
-    else:
-        command = "grep"
-
+    command = "dir.exe" if ON_WINDOWS else "grep"
     comps = complete_command(
         completion_context_parse(command[:-1], len(command) - 1).command
     )

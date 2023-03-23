@@ -482,11 +482,11 @@ def test_nested_command(commandline, context, nesting):
 
 
 NESTING_MALFORMATIONS = (
-    lambda s: s[:-1],  # remove the last closing brace ')' / ']'
-    lambda s: s + s[-1],  # add an extra closing brace ')' / ']'
+    lambda s: s[:-1],
+    lambda s: s + s[-1],
     lambda s: s[-1] + s,
-    lambda s: s + "$(",
-    lambda s: "$(" + s,
+    lambda s: f"{s}$(",
+    lambda s: f"$({s}",
 )
 
 
@@ -652,7 +652,7 @@ def test_multiple_commands(keyword, commands, context):
         if keyword.endswith(" "):
             # the last space is part of the command
             relative_index += 1
-            cursor_command = " " + cursor_command
+            cursor_command = f" {cursor_command}"
 
     assert_match(joined_command, context, is_main_command=True)
 
@@ -711,8 +711,8 @@ def test_multiple_nested_commands():
 def test_multiple_partial_string_arg(commandline, context):
     partial_commandline = commandline.rstrip("\"'")
     partial_context = context._replace(closing_quote="")
-    assert_match("echo;" + partial_commandline, partial_context)
-    assert_match("echo $[a ;" + partial_commandline, partial_context)
+    assert_match(f"echo;{partial_commandline}", partial_context)
+    assert_match(f"echo $[a ;{partial_commandline}", partial_context)
 
 
 @pytest.mark.parametrize(

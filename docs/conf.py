@@ -292,7 +292,7 @@ def _gather_groups(cls, env: Env, _seen=None):
     ordered_vars = OrderedDict()  # within that section sort keys
     for key, var in env_vars:
         var = getattr(key, "pattern", key)
-        title = "$" + var
+        title = f"${var}"
         vd = env.get_docs(key)
         info = dict(
             title=title,

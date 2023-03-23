@@ -67,7 +67,7 @@ def _unc_check_enabled() -> bool:
             "DisableUNCCheck",
         )
 
-    return False if wval else True
+    return not wval
 
 
 def _is_unc_path(some_path) -> bool:
@@ -106,7 +106,7 @@ def _unc_map_temp_drive(unc_path) -> str:
             return os.path.join(d, rem_path)
 
     for dord in range(ord("z"), ord("a"), -1):
-        d = chr(dord) + ":"
+        d = f"{chr(dord)}:"
         if not os.path.isdir(d):  # find unused drive letter starting from z:
             subprocess.check_output(["NET", "USE", d, unc_share], text=True)
             _unc_tempDrives[d] = unc_share
@@ -243,11 +243,7 @@ def cd(args, stdin=None):
     else:
         return (
             "",
-            (
-                "cd takes 0 or 1 arguments, not {}. An additional `-P` "
-                "flag can be passed in first position to follow symlinks."
-                "\n".format(len(args))
-            ),
+            f"cd takes 0 or 1 arguments, not {len(args)}. An additional `-P` flag can be passed in first position to follow symlinks.\n",
             1,
         )
     if not os.path.exists(d):
@@ -350,10 +346,7 @@ def pushd_fn(
             else:
                 new_pwd = DIRSTACK.pop(len(DIRSTACK) - 1 - num)
         elif dir_or_n.startswith(BACKWARD):
-            if num == 0:
-                new_pwd = None
-            else:
-                new_pwd = DIRSTACK.pop(num - 1)
+            new_pwd = None if num == 0 else DIRSTACK.pop(num - 1)
         else:
             e = "Invalid argument to pushd: {0}\n"
             return None, e.format(dir_or_n), 1
@@ -370,10 +363,7 @@ def pushd_fn(
     if len(DIRSTACK) > maxsize:
         DIRSTACK = DIRSTACK[:maxsize]
 
-    if not quiet and not env.get("PUSHD_SILENT"):
-        return dirs([], None)
-
-    return None, None, 0
+    return (None, None, 0) if quiet or env.get("PUSHD_SILENT") else dirs([], None)
 
 
 pushd = ArgParserAlias(func=pushd_fn, has_args=True, prog="pushd")
@@ -404,13 +394,7 @@ def popd_fn(
 
     env = XSH.env
 
-    if env.get("PUSHD_MINUS"):
-        BACKWARD = "-"
-        FORWARD = "+"
-    else:
-        BACKWARD = "-"
-        FORWARD = "+"
-
+    FORWARD = "+" if env.get("PUSHD_MINUS") else "+"
     new_pwd: tp.Optional[str] = None
     if nth is None:
         try:
@@ -429,6 +413,7 @@ def popd_fn(
             e = "Invalid argument to popd: {0}\n"
             return None, e.format(nth), 1
 
+        BACKWARD = "-"
         if num > len(DIRSTACK):
             e = "Too few elements in dirstack ({0} elements)\n"
             return None, e.format(len(DIRSTACK)), 1
@@ -446,21 +431,17 @@ def popd_fn(
             e = "Invalid argument to popd: {0}\n"
             return None, e.format(nth), 1
 
-    if new_pwd is not None:
-        if cd:
-            env = XSH.env
-            pwd = env["PWD"]
+    if new_pwd is not None and cd:
+        env = XSH.env
+        pwd = env["PWD"]
 
-            _change_working_directory(new_pwd)
+        _change_working_directory(new_pwd)
 
-            if ON_WINDOWS:
-                drive, rem_path = os.path.splitdrive(pwd)
-                _unc_unmap_temp_drive(drive.casefold(), new_pwd)
+        if ON_WINDOWS:
+            drive, rem_path = os.path.splitdrive(pwd)
+            _unc_unmap_temp_drive(drive.casefold(), new_pwd)
 
-    if not quiet and not env.get("PUSHD_SILENT"):
-        return dirs([], None)
-
-    return None, None, 0
+    return (None, None, 0) if quiet or env.get("PUSHD_SILENT") else dirs([], None)
 
 
 popd = ArgParserAlias(func=popd_fn, has_args=True, prog="popd")
@@ -496,13 +477,7 @@ def dirs_fn(
     env = XSH.env
     dirstack = [os.path.expanduser(env["PWD"])] + DIRSTACK
 
-    if env.get("PUSHD_MINUS"):
-        BACKWARD = "-"
-        FORWARD = "+"
-    else:
-        BACKWARD = "-"
-        FORWARD = "+"
-
+    FORWARD = "+" if env.get("PUSHD_MINUS") else "+"
     if clear:
         DIRSTACK = []
         return None, None, 0
@@ -540,6 +515,7 @@ def dirs_fn(
             e = "Too few elements in dirstack ({0} elements)\n"
             return None, e.format(len(o)), 1
 
+        BACKWARD = "-"
         if nth.startswith(BACKWARD):
             idx = num
         elif nth.startswith(FORWARD):

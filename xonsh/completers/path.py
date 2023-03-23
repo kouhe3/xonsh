@@ -16,7 +16,7 @@ def PATTERN_NEED_QUOTES():
     pattern = r'\s`\$\{\}\[\]\,\*\(\)"\'\?&#'
     if xp.ON_WINDOWS:
         pattern += "%"
-    pattern = "[" + pattern + "]" + r"|\band\b|\bor\b"
+    pattern = f"[{pattern}]" + r"|\band\b|\bor\b"
     return re.compile(pattern)
 
 
@@ -25,12 +25,7 @@ def cd_in_command(line):
     lexer = XSH.execer.parser.lexer
     lexer.reset()
     lexer.input(line)
-    have_cd = False
-    for tok in lexer:
-        if tok.type == "NAME" and tok.value == "cd":
-            have_cd = True
-            break
-    return have_cd
+    return any(tok.type == "NAME" and tok.value == "cd" for tok in lexer)
 
 
 def _get_normalized_pstring_quote(s):
@@ -54,7 +49,7 @@ def _path_from_partial_string(inp, pos=None):
     else:
         if endix != pos:
             _test = partial[endix:pos]
-            if not any(i == " " for i in _test):
+            if all(i != " " for i in _test):
                 _post = _test
             else:
                 return None
@@ -62,11 +57,11 @@ def _path_from_partial_string(inp, pos=None):
 
     # If 'pr'/'rp', treat as raw string, otherwise strip leading 'p'
     pstring_pre = _get_normalized_pstring_quote(quote)[0]
-    if pstring_pre == "pr":
-        string = f"r{string[2:]}"
-    elif pstring_pre == "p":
+    if pstring_pre == "p":
         string = string[1:]
 
+    elif pstring_pre == "pr":
+        string = f"r{string[2:]}"
     end = xt.RE_STRING_START.sub("", quote)
     _string = string
     if not _string.endswith(end):
@@ -124,9 +119,9 @@ def _dots(prefix):
     if complete_dots == "always":
         prefixes.add("")
     if prefix in prefixes:
-        return ("." + slash, ".." + slash)
+        return f".{slash}", f"..{slash}"
     elif prefix == "..":
-        return (".." + slash,)
+        return (f"..{slash}", )
     else:
         return ()
 
@@ -137,7 +132,7 @@ def _add_cdpaths(paths, prefix):
     csc = env.get("CASE_SENSITIVE_COMPLETIONS")
     glob_sorted = env.get("GLOB_SORTED")
     for cdp in env.get("CDPATH"):
-        test_glob = os.path.join(cdp, prefix) + "*"
+        test_glob = f"{os.path.join(cdp, prefix)}*"
         for s in xt.iglobpath(
             test_glob, ignore_case=(not csc), sort_result=glob_sorted
         ):
@@ -148,18 +143,12 @@ def _add_cdpaths(paths, prefix):
 def _quote_to_use(x):
     single = "'"
     double = '"'
-    if single in x and double not in x:
-        return double
-    else:
-        return single
+    return double if single in x and double not in x else single
 
 
 def _is_directory_in_cdpath(path):
     env = XSH.env
-    for cdp in env.get("CDPATH"):
-        if os.path.isdir(os.path.join(cdp, path)):
-            return True
-    return False
+    return any(os.path.isdir(os.path.join(cdp, path)) for cdp in env.get("CDPATH"))
 
 
 def _quote_paths(paths, start, end, append_end=True, cdpath=False):
@@ -190,11 +179,10 @@ def _quote_paths(paths, start, end, append_end=True, cdpath=False):
         else:
             _tail = ""
         if start != "" and "r" not in start and backslash in s:
-            start = "r%s" % start
+            start = f"r{start}"
         s = s + _tail
-        if end != "":
-            if "r" not in start.lower():
-                s = s.replace(backslash, double_backslash)
+        if end != "" and "r" not in start.lower():
+            s = s.replace(backslash, double_backslash)
         if end in s:
             s = s.replace(end, "".join("\\%s" % i for i in end))
         s = start + s + end if append_end else start + s
@@ -204,9 +192,7 @@ def _quote_paths(paths, start, end, append_end=True, cdpath=False):
 
 def _joinpath(path):
     # convert our tuple representation back into a string representing a path
-    if path is None:
-        return ""
-    elif len(path) == 0:
+    if path is None or len(path) == 0:
         return ""
     elif path == ("",):
         return xt.get_sep()
@@ -220,10 +206,7 @@ def _splitpath(path):
     # convert a path into an intermediate tuple representation
     # if this tuple starts with '', it means that the path was an absolute path
     path = _normpath(path)
-    if path.startswith(xt.get_sep()):
-        pre = ("",)
-    else:
-        pre = ()
+    pre = ("", ) if path.startswith(xt.get_sep()) else ()
     return pre + _splitpath_helper(path, ())
 
 
@@ -299,14 +282,16 @@ def _complete_path_raw(prefix, line, start, end, ctx, cdpath=True, filtfunc=None
         if len(line) >= end + 1 and line[end] == path_str_end:
             append_end = False
     tilde = "~"
-    paths = set()
     env = XSH.env
     csc = env.get("CASE_SENSITIVE_COMPLETIONS")
     glob_sorted = env.get("GLOB_SORTED")
     prefix = glob.escape(prefix)
-    for s in xt.iglobpath(prefix + "*", ignore_case=(not csc), sort_result=glob_sorted):
-        paths.add(s)
-    if len(paths) == 0 and env.get("SUBSEQUENCE_PATH_COMPLETION"):
+    paths = set(
+        xt.iglobpath(
+            f"{prefix}*", ignore_case=(not csc), sort_result=glob_sorted
+        )
+    )
+    if not paths and env.get("SUBSEQUENCE_PATH_COMPLETION"):
         # this block implements 'subsequence' matching, similar to fish and zsh.
         # matches are based on subsequences, not substrings.
         # e.g., ~/u/ro completes to ~/lou/carcolh
@@ -327,13 +312,9 @@ def _complete_path_raw(prefix, line, start, end, ctx, cdpath=True, filtfunc=None
             for i in p:
                 matches_so_far = _expand_one(matches_so_far, i, csc)
             paths |= {_joinpath(i) for i in matches_so_far}
-    if len(paths) == 0 and env.get("FUZZY_PATH_COMPLETION"):
+    if not paths and env.get("FUZZY_PATH_COMPLETION"):
         threshold = env.get("SUGGEST_THRESHOLD")
-        for s in xt.iglobpath(
-            os.path.dirname(prefix) + "*",
-            ignore_case=(not csc),
-            sort_result=glob_sorted,
-        ):
+        for s in xt.iglobpath(f"{os.path.dirname(prefix)}*", ignore_case=(not csc), sort_result=glob_sorted):
             if xt.levenshtein(prefix, s, threshold) < threshold:
                 paths.add(s)
     if cdpath and cd_in_command(line):

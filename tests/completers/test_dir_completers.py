@@ -39,7 +39,7 @@ def test_dirs_only(cmd, dir_path, check_completer):
 
 
 def test_opening_quotes(cmd, dir_path, check_completer):
-    assert check_completer(cmd, "r'" + dir_path) == {f"r'{dir_path}{sep}'"}
+    assert check_completer(cmd, f"r'{dir_path}") == {f"r'{dir_path}{sep}'"}
 
 
 def test_closing_quotes(cmd, dir_path, check_completer):
@@ -48,10 +48,10 @@ def test_closing_quotes(cmd, dir_path, check_completer):
     if ON_WINDOWS:
         prefix = prefix.replace("\\", "\\\\")
         # the path completer converts to a raw string if there's a backslash
-        exp = "r" + exp
+        exp = f"r{exp}"
 
     values, completions = check_completer(
-        cmd, "'''" + prefix + "'''", send_original=True
+        cmd, f"'''{prefix}'''", send_original=True
     )
 
     assert values == {exp}

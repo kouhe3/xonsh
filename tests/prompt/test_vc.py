@@ -82,7 +82,7 @@ def test_test_repo(repo):
         existing_files = {file.name for file in repo["dir"].iterdir()}
         assert existing_files.intersection(metadata_file_names)
     else:
-        test_vc_dir = repo["dir"] / ".{}".format(repo["vc"])
+        test_vc_dir = repo["dir"] / f'.{repo["vc"]}'
         assert test_vc_dir.is_dir()
     if repo["vc"] == "git":
         test_file = repo["dir"] / "test-file"
@@ -98,7 +98,7 @@ def test_no_repo(tmpdir, set_xenv):
 def test_vc_get_branch(repo, set_xenv):
     set_xenv(repo["dir"])
     # get corresponding function from vc module
-    get_branch = "get_{}_branch".format(repo["vc"])
+    get_branch = f'get_{repo["vc"]}_branch'
     branch = getattr(vc, get_branch)()
 
     assert branch in VC_BRANCH[repo["vc"]]
@@ -142,7 +142,7 @@ def test_current_branch_does_not_call_locate_binary_for_non_empty_cmds_cache(
 
 
 def test_dirty_working_directory(repo, set_xenv):
-    get_dwd = "{}_dirty_working_directory".format(repo["vc"])
+    get_dwd = f'{repo["vc"]}_dirty_working_directory'
     set_xenv(repo["dir"])
 
     # By default, git / hg do not care about untracked files

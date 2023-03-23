@@ -257,9 +257,7 @@ def _pprint_displayhook(value):
         builtins._ = value
         return
     env = XSH.env
-    printed_val = None
-    if env.get("PRETTY_PRINT_RESULTS"):
-        printed_val = pretty(value)
+    printed_val = pretty(value) if env.get("PRETTY_PRINT_RESULTS") else None
     if not isinstance(printed_val, str):
         # pretty may fail (i.e for unittest.mock.Mock)
         printed_val = repr(value)
@@ -427,13 +425,10 @@ def _failback_to_other_shells(args, err):
     # use real os.environ, in case Xonsh hasn't initialized yet
     # but don't fail back to same shell that just failed.
 
-    try:
+    with contextlib.suppress(Exception):
         env_shell = os.getenv("SHELL")
         if env_shell and os.path.exists(env_shell) and env_shell != sys.argv[0]:
             foreign_shell = env_shell
-    except Exception:
-        pass
-
     # otherwise, find acceptable shell from (unix) list of installed shells.
 
     if not foreign_shell:
@@ -457,13 +452,12 @@ def _failback_to_other_shells(args, err):
                 foreign_shell = line
                 break
 
-    if foreign_shell:
-        traceback.print_exc()
-        print("Xonsh encountered an issue during launch", file=sys.stderr)
-        print(f"Failback to {foreign_shell}", file=sys.stderr)
-        os.execlp(foreign_shell, foreign_shell)
-    else:
+    if not foreign_shell:
         raise err
+    traceback.print_exc()
+    print("Xonsh encountered an issue during launch", file=sys.stderr)
+    print(f"Failback to {foreign_shell}", file=sys.stderr)
+    os.execlp(foreign_shell, foreign_shell)
 
 
 def main(argv=None):

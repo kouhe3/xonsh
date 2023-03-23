@@ -103,6 +103,6 @@ def test_path_in_python_code(num_args, completion_context_parse):
 
         inner_line = " ".join(map(repr, args))
         exp = xcp.complete_path(completion_context_parse(inner_line, len(inner_line)))
-        line = "@(" + inner_line
+        line = f"@({inner_line}"
         out = xcp.complete_path(completion_context_parse(line, len(line)))
         assert out == exp

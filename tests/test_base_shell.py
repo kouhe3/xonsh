@@ -19,7 +19,7 @@ def test_pwd_tracks_cwd(xession, xonsh_execer, tmpdir_factory, monkeypatch):
 
     assert os.getcwd() == cur_wd
 
-    bc.default('os.chdir(r"' + asubdir + '")')
+    bc.default(f'os.chdir(r"{asubdir}")')
 
     assert os.path.abspath(os.getcwd()) == os.path.abspath(asubdir)
     assert os.path.abspath(os.getcwd()) == os.path.abspath(xession.env["PWD"])
@@ -30,10 +30,7 @@ def test_pwd_tracks_cwd(xession, xonsh_execer, tmpdir_factory, monkeypatch):
 def test_transform(xession):
     @xession.builtins.events.on_transform_command
     def spam2egg(cmd, **_):
-        if cmd == "spam":
-            return "egg"
-        else:
-            return cmd
+        return "egg" if cmd == "spam" else cmd
 
     assert transform_command("spam") == "egg"
     assert transform_command("egg") == "egg"
@@ -62,4 +59,4 @@ def test_default_append_history(cmd, exp_append_history, xonsh_session, monkeypa
     if exp_append_history:
         assert len(append_history_calls) == 1
     else:
-        assert len(append_history_calls) == 0
+        assert not append_history_calls

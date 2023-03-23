@@ -33,7 +33,7 @@ def _print_duplicate_message(duplicates):
 
     for filename, vals in sorted(duplicates.items()):
         msg = f"for {filename} ambiquity between:\n  "
-        vals = [m + ":" + c for m, c in vals]
+        vals = [f"{m}:{c}" for m, c in vals]
         msg += "\n  ".join(sorted(vals))
         print(msg, file=sys.stderr)
 
@@ -128,7 +128,7 @@ def _discover_lexers():
                 duplicates[filename].add(exts[filename])
             exts[filename] = val
     # remove some ambiquity
-    exts.update(default_exts)
+    exts |= default_exts
     # print duplicate message
     if DEBUG:
         _print_duplicate_message(duplicates)
@@ -182,8 +182,8 @@ def _discover_formatters():
                 duplicates[alias].add(names[alias])
             names[alias] = val
     # remove some ambiquity
-    exts.update(default_exts)
-    names.update(default_names)
+    exts |= default_exts
+    names |= default_names
     # print dumplicate message
     if DEBUG:
         _print_duplicate_message(duplicates)
@@ -212,7 +212,7 @@ def _discover_styles():
             duplicates[name].add(names[name])
         names[name] = val
     # remove some ambiquity
-    names.update(default_names)
+    names |= default_names
     # print dumplicate message
     if DEBUG:
         _print_duplicate_message(duplicates)
@@ -242,7 +242,7 @@ def _discover_filters():
             duplicates[name].add(names[name])
         names[name] = val
     # remove some ambiquity
-    names.update(default_names)
+    names |= default_names
     # print dumplicate message
     if DEBUG:
         _print_duplicate_message(duplicates)
@@ -251,8 +251,7 @@ def _discover_filters():
 
 def build_cache():
     """Does the hard work of building a cache from nothing."""
-    cache = {}
-    cache["lexers"] = _discover_lexers()
+    cache = {"lexers": _discover_lexers()}
     cache["formatters"] = _discover_formatters()
     cache["styles"] = _discover_styles()
     cache["filters"] = _discover_filters()
@@ -324,7 +323,7 @@ def load_or_build():
             print("pygments cache not found, building...", file=sys.stderr)
         CACHE = build_cache()
         if DEBUG:
-            print("...writing cache to " + fname, file=sys.stderr)
+            print(f"...writing cache to {fname}", file=sys.stderr)
         write_cache(fname)
 
 

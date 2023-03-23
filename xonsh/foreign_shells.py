@@ -291,8 +291,7 @@ def parse_env(s):
         return {}
     g1 = m.group(1)
     g1 = g1[:-1] if g1.endswith("\n") else g1
-    env = dict(ENV_SPLIT_RE.findall(g1))
-    return env
+    return dict(ENV_SPLIT_RE.findall(g1))
 
 
 @lazyobject
@@ -630,7 +629,7 @@ def load_foreign_envs(shells):
         shell = ensure_shell(shell)
         shenv, _ = foreign_shell_data(**shell)
         if shenv:
-            env.update(shenv)
+            env |= shenv
     return env
 
 
@@ -663,5 +662,5 @@ def load_foreign_aliases(shells):
                         "which tries to override xonsh alias.",
                         file=sys.stderr,
                     )
-        aliases.update(shaliases)
+        aliases |= shaliases
     return aliases

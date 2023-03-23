@@ -33,7 +33,7 @@ class Parser(ThreeEightParser):
             after_comma = [p.value if isinstance(p, Index) else p for p in p2]
             if (
                 isinstance(p1, ast.Slice)
-                or any([isinstance(x, ast.Slice) for x in after_comma])
+                or any(isinstance(x, ast.Slice) for x in after_comma)
                 or is_subscript
             ):
                 p1 = Index(

@@ -48,14 +48,12 @@ def SIGNAL_MESSAGES():
         signal.SIGSEGV: "Segmentation fault",
     }
     if xp.ON_POSIX:
-        sm.update(
-            {
-                signal.SIGQUIT: "Quit",
-                signal.SIGHUP: "Hangup",
-                signal.SIGKILL: "Killed",
-                signal.SIGTSTP: "Stopped",
-            }
-        )
+        sm |= {
+            signal.SIGQUIT: "Quit",
+            signal.SIGHUP: "Hangup",
+            signal.SIGKILL: "Killed",
+            signal.SIGTSTP: "Stopped",
+        }
     return sm
 
 
@@ -83,9 +81,7 @@ def update_process_group(pipeline_group, background):
     env = XSH.env
     if not env.get("XONSH_INTERACTIVE"):
         return False
-    if background:
-        return True
-    return xj.give_terminal_to(pipeline_group)
+    return True if background else xj.give_terminal_to(pipeline_group)
 
 
 class CommandPipeline:
@@ -183,7 +179,7 @@ class CommandPipeline:
 
     def __repr__(self):
         s = self.__class__.__name__ + "(\n  "
-        s += ",\n  ".join(a + "=" + repr(getattr(self, a)) for a in self.attrnames)
+        s += ",\n  ".join(f"{a}={repr(getattr(self, a))}" for a in self.attrnames)
         s += "\n)"
         return s
 
@@ -258,8 +254,7 @@ class CommandPipeline:
                     self.end(tee_output=False)
                 elif self.captured == "hiddenobject" and stdout:
                     b = stdout.read()
-                    lines = b.splitlines(keepends=True)
-                    yield from lines
+                    yield from b.splitlines(keepends=True)
                     self.end(tee_output=False)
                 elif self.captured == "stdout":
                     b = stdout.read()
@@ -321,10 +316,7 @@ class CommandPipeline:
                     # sure we have fully started up, etc.
                     check_prev_done = True
             # this is for CPU usage
-            if i + j == 0:
-                cnt = min(cnt + 1, 1000)
-            else:
-                cnt = 1
+            cnt = min(cnt + 1, 1000) if i + j == 0 else 1
             time.sleep(timeout * cnt)
         # read from process now that it is over
         yield from safe_readlines(stdout)
@@ -402,10 +394,9 @@ class CommandPipeline:
         if self.stderr_postfix:
             b += self.stderr_postfix
         stderr_has_buffer = hasattr(sys.stderr, "buffer")
-        show_stderr = self.captured != "object" or env.get(
+        if show_stderr := self.captured != "object" or env.get(
             "XONSH_SUBPROC_CAPTURED_PRINT_STDERR", True
-        )
-        if show_stderr:
+        ):
             # write bytes to std stream
             if stderr_has_buffer:
                 sys.stderr.buffer.write(b)
@@ -576,8 +567,7 @@ class CommandPipeline:
         if proc_signal is None:
             return
         sig, core = proc_signal
-        sig_str = SIGNAL_MESSAGES.get(sig)
-        if sig_str:
+        if sig_str := SIGNAL_MESSAGES.get(sig):
             if core:
                 sig_str += " (core dumped)"
             print(sig_str, file=sys.stderr)
@@ -631,12 +621,11 @@ class CommandPipeline:
     @property
     def output(self):
         """Non-blocking, lazy access to output"""
-        if self.ended:
-            if self._output is None:
-                self._output = "".join(self.lines)
-            return self._output
-        else:
+        if not self.ended:
             return "".join(self.lines)
+        if self._output is None:
+            self._output = "".join(self.lines)
+        return self._output
 
     @property
     def out(self):
@@ -671,9 +660,7 @@ class CommandPipeline:
     def returncode(self):
         """Process return code, waits until command is completed."""
         self.end()
-        if self.proc is None:
-            return 1
-        return self.proc.returncode
+        return 1 if self.proc is None else self.proc.returncode
 
     @property
     def args(self):
@@ -762,13 +749,12 @@ class HiddenCommandPipeline(CommandPipeline):
 
 def resume_process(p):
     """Sends SIGCONT to a process if possible."""
-    can_send_signal = (
+    if can_send_signal := (
         hasattr(p, "send_signal")
         and xp.ON_POSIX
         and not xp.ON_MSYS
         and not xp.ON_CYGWIN
-    )
-    if can_send_signal:
+    ):
         try:
             p.send_signal(signal.SIGCONT)
         except PermissionError:

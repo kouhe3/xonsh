@@ -19,9 +19,7 @@ def check_news_file(fname):
     name = fname.name
     with open(fname.path) as f:
         content = f.read()
-    errors = restructuredtext_lint.lint(content)
-
-    if errors:
+    if errors := restructuredtext_lint.lint(content):
         err_msgs = os.linesep.join(err.message for err in errors)
         pytest.fail(f"{fname}: Invalid ReST\n{err_msgs}")
 
@@ -37,10 +35,7 @@ def check_news_file(fname):
                     "".format(name, i + 1, cat, list(CATEGORIES)),
                     pytrace=True,
                 )
-            if l.endswith("None"):
-                form += "3"
-            else:
-                form += "2"
+            form += "3" if l.endswith("None") else "2"
         elif l.startswith("* <news item>"):
             form += "4"
         elif l.startswith("* ") or l.startswith("- ") or l.startswith("  "):

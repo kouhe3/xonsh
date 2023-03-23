@@ -72,10 +72,7 @@ def get_jobs() -> tp.Dict[int, tp.Dict]:
     try:
         return _jobs_thread_local.jobs
     except AttributeError:
-        if on_main_thread():
-            _jobs_thread_local.jobs = XSH.all_jobs
-        else:
-            _jobs_thread_local.jobs = {}
+        _jobs_thread_local.jobs = XSH.all_jobs if on_main_thread() else {}
         return _jobs_thread_local.jobs
 
 
@@ -88,10 +85,8 @@ if ON_DARWIN:
         for pid in job["pids"]:
             if pid is None:  # the pid of an aliased proc is None
                 continue
-            try:
+            with contextlib.suppress(ProcessLookupError):
                 os.kill(pid, signal)
-            except ProcessLookupError:
-                pass
 
 elif ON_WINDOWS:
     pass
@@ -103,10 +98,8 @@ elif ON_CYGWIN or ON_MSYS:
             os.killpg(job["pgrp"], signal)
         except Exception:
             for pid in job["pids"]:
-                try:
+                with contextlib.suppress(Exception):
                     os.kill(pid, signal)
-                except Exception:
-                    pass
 
 else:
 
@@ -114,12 +107,10 @@ else:
         pgrp = job["pgrp"]
         if pgrp is None:
             for pid in job["pids"]:
-                try:
+                with contextlib.suppress(Exception):
                     os.kill(pid, signal)
-                except Exception:
-                    pass
         else:
-            os.killpg(job["pgrp"], signal)
+            os.killpg(pgrp, signal)
 
 
 if ON_WINDOWS:
@@ -158,10 +149,8 @@ if ON_WINDOWS:
             except subprocess.TimeoutExpired:
                 pass
             except KeyboardInterrupt:
-                try:
+                with contextlib.suppress(subprocess.CalledProcessError):
                     _kill(active_task)
-                except subprocess.CalledProcessError:
-                    pass  # ignore error if process closed before we got here
         return wait_for_active_job(last_task=active_task)
 
 else:
@@ -209,15 +198,14 @@ else:
                 mask |= 1 << sig
             oldmask = ctypes.c_ulong()
             mask = ctypes.c_ulong(mask)
-            result = LIBC.pthread_sigmask(
+            if result := LIBC.pthread_sigmask(
                 how, ctypes.byref(mask), ctypes.byref(oldmask)
-            )
-            if result:
+            ):
                 raise OSError(result, "Sigmask error.")
 
             return {
                 sig
-                for sig in getattr(signal, "Signals", range(0, 65))
+                for sig in getattr(signal, "Signals", range(65))
                 if (oldmask.value >> sig) & 1
             }
 
@@ -239,15 +227,10 @@ else:
             # see issue #2288
             return False
         except OSError as e:
-            if e.errno == 22:  # [Errno 22] Invalid argument
+            if e.errno in [22, 25]:
                 # there are cases that all the processes of pgid have
                 # finished, then we don't need to do anything here, see
                 # issue #2220
-                return False
-            elif e.errno == 25:  # [Errno 25] Inappropriate ioctl for device
-                # There are also cases where we are not connected to a
-                # real TTY, even though we may be run in interactive
-                # mode. See issue #2267 for an example with emacs
                 return False
             else:
                 raise
@@ -350,8 +333,7 @@ def format_job_string(num: int) -> str:
 
 def print_one_job(num, outfile=sys.stdout):
     """Print a line describing job number ``num``."""
-    info = format_job_string(num)
-    if info:
+    if info := format_job_string(num):
         print(info, file=outfile)
 
 
@@ -511,12 +493,11 @@ def bg(args, stdin=None):
     single number is given as an argument, resume that job in the background.
     """
     res = resume_job(args, wording="bg")
-    if res is None:
-        curtask = get_task(get_tasks()[0])
-        curtask["bg"] = True
-        _continue(curtask)
-    else:
+    if res is not None:
         return res
+    curtask = get_task(get_tasks()[0])
+    curtask["bg"] = True
+    _continue(curtask)
 
 
 def job_id_completer(xsh, **_):

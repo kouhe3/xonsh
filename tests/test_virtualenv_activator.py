@@ -14,10 +14,7 @@ def test_xonsh_activator(tmp_path):
     assert venv_dir.is_dir()
 
     # Check activation script created
-    if ON_WINDOWS:
-        bin_path = venv_dir / "Scripts"
-    else:
-        bin_path = venv_dir / "bin"
+    bin_path = venv_dir / "Scripts" if ON_WINDOWS else venv_dir / "bin"
     activate_path = bin_path / "activate.xsh"
     assert activate_path.is_file()
 

@@ -81,7 +81,7 @@ def ON_BSD():
 @lazybool
 def ON_BEOS():
     """True if we are on BeOS or Haiku."""
-    return sys.platform == "beos5" or sys.platform == "haiku1"
+    return sys.platform in ["beos5", "haiku1"]
 
 
 @lazybool
@@ -138,13 +138,11 @@ def HAS_PYGMENTS():
 @functools.lru_cache(1)
 def pygments_version():
     """pygments.__version__ version if available, else None."""
-    if HAS_PYGMENTS:
-        import pygments
+    if not HAS_PYGMENTS:
+        return None
+    import pygments
 
-        v = pygments.__version__
-    else:
-        v = None
-    return v
+    return pygments.__version__
 
 
 @functools.lru_cache(1)
@@ -166,12 +164,11 @@ def has_prompt_toolkit():
 @functools.lru_cache(1)
 def ptk_version():
     """Returns `prompt_toolkit.__version__` if available, else ``None``."""
-    if has_prompt_toolkit():
-        import prompt_toolkit
-
-        return getattr(prompt_toolkit, "__version__", "<0.57")
-    else:
+    if not has_prompt_toolkit():
         return None
+    import prompt_toolkit
+
+    return getattr(prompt_toolkit, "__version__", "<0.57")
 
 
 @functools.lru_cache(1)
@@ -194,14 +191,13 @@ def ptk_above_min_supported():
 
 @functools.lru_cache(1)
 def win_ansi_support():
-    if ON_WINDOWS:
-        try:
-            from prompt_toolkit.utils import is_conemu_ansi, is_windows_vt100_supported
-        except ImportError:
-            return False
-        return is_conemu_ansi() or is_windows_vt100_supported()
-    else:
+    if not ON_WINDOWS:
         return False
+    try:
+        from prompt_toolkit.utils import is_conemu_ansi, is_windows_vt100_supported
+    except ImportError:
+        return False
+    return is_conemu_ansi() or is_windows_vt100_supported()
 
 
 @functools.lru_cache(1)
@@ -216,9 +212,7 @@ def best_shell_type():
 
     if XSH.env.get("TERM", "") == "dumb":
         return "dumb"
-    if has_prompt_toolkit():
-        return "prompt_toolkit"
-    return "readline"
+    return "prompt_toolkit" if has_prompt_toolkit() else "readline"
 
 
 @functools.lru_cache(1)
@@ -263,10 +257,7 @@ def pathbasename(p):
 @lazyobject
 def expanduser():
     """Dispatches to the correct platform-dependent expanduser() function."""
-    if ON_WINDOWS:
-        return windows_expanduser
-    else:
-        return os.path.expanduser
+    return windows_expanduser if ON_WINDOWS else os.path.expanduser
 
 
 def windows_expanduser(path):
@@ -375,8 +366,7 @@ def windows_bash_command():
 
     wbc = "bash"
     cmd_cache = XSH.commands_cache
-    bash_on_path = cmd_cache.lazy_locate_binary("bash", ignore_alias=True)
-    if bash_on_path:
+    if bash_on_path := cmd_cache.lazy_locate_binary("bash", ignore_alias=True):
         try:
             out = subprocess.check_output(
                 [bash_on_path, "--version"],
@@ -392,12 +382,10 @@ def windows_bash_command():
 
         if bash_works:
             wbc = bash_on_path
-        else:
-            gfwp = git_for_windows_path()
-            if gfwp:
-                bashcmd = os.path.join(gfwp, "bin\\bash.exe")
-                if os.path.isfile(bashcmd):
-                    wbc = bashcmd
+        elif gfwp := git_for_windows_path():
+            bashcmd = os.path.join(gfwp, "bin\\bash.exe")
+            if os.path.isfile(bashcmd):
+                wbc = bashcmd
     return wbc
 
 
@@ -468,20 +456,13 @@ def os_environ():
     This can probably go away once support for Python v3.5 or v3.6 is
     dropped.
     """
-    if ON_WINDOWS:
-        return OSEnvironCasePreserving()
-    else:
-        return os.environ
+    return OSEnvironCasePreserving() if ON_WINDOWS else os.environ
 
 
 @functools.lru_cache(1)
 def bash_command():
     """Determines the command for Bash on the current platform."""
-    if ON_WINDOWS:
-        bc = windows_bash_command()
-    else:
-        bc = "bash"
-    return bc
+    return windows_bash_command() if ON_WINDOWS else "bash"
 
 
 @lazyobject
@@ -490,33 +471,30 @@ def BASH_COMPLETIONS_DEFAULT():
     the current platform.
     """
     if ON_LINUX or ON_CYGWIN or ON_MSYS:
-        bcd = ("/usr/share/bash-completion/bash_completion",)
+        return ("/usr/share/bash-completion/bash_completion",)
     elif ON_DARWIN:
-        bcd = (
-            "/usr/local/share/bash-completion/bash_completion",  # v2.x
-            "/usr/local/etc/bash_completion",  # v1.x
-            "/opt/homebrew/share/bash-completion/bash_completion",  # v2.x on M1
+        return (
+            "/usr/local/share/bash-completion/bash_completion",
+            "/usr/local/etc/bash_completion",
+            "/opt/homebrew/share/bash-completion/bash_completion",
         )
     elif ON_WINDOWS and git_for_windows_path():
-        bcd = (
-            os.path.join(
-                git_for_windows_path(), "usr\\share\\bash-completion\\bash_completion"
-            ),
-            os.path.join(
-                git_for_windows_path(),
-                "mingw64\\share\\git\\completion\\" "git-completion.bash",
-            ),
+        return os.path.join(
+            git_for_windows_path(),
+            "usr\\share\\bash-completion\\bash_completion",
+        ), os.path.join(
+            git_for_windows_path(),
+            "mingw64\\share\\git\\completion\\" "git-completion.bash",
         )
     else:
-        bcd = ()
-    return bcd
+        return ()
 
 
 @lazyobject
 def PATH_DEFAULT():
     if ON_LINUX or ON_CYGWIN or ON_MSYS:
-        if linux_distro() == "arch":
-            pd = (
+        return (
+            (
                 "/usr/local/sbin",
                 "/usr/local/bin",
                 "/usr/bin",
@@ -524,8 +502,8 @@ def PATH_DEFAULT():
                 "/usr/bin/vendor_perl",
                 "/usr/bin/core_perl",
             )
-        else:
-            pd = (
+            if linux_distro() == "arch"
+            else (
                 os.path.expanduser("~/bin"),
                 "/usr/local/sbin",
                 "/usr/local/bin",
@@ -536,8 +514,9 @@ def PATH_DEFAULT():
                 "/usr/games",
                 "/usr/local/games",
             )
+        )
     elif ON_DARWIN:
-        pd = ("/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin")
+        return "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"
     elif ON_WINDOWS:
         import winreg
 
@@ -545,10 +524,9 @@ def PATH_DEFAULT():
             winreg.HKEY_LOCAL_MACHINE,
             r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment",
         )
-        pd = tuple(winreg.QueryValueEx(key, "Path")[0].split(os.pathsep))
+        return tuple(winreg.QueryValueEx(key, "Path")[0].split(os.pathsep))
     else:
-        pd = ()
-    return pd
+        return ()
 
 
 #
